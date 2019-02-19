@@ -12,6 +12,9 @@
 
 #include <vector>
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 #pragma comment (lib, "d3d12.lib")
 #pragma comment (lib, "DXGI.lib")
 #pragma comment (lib, "d3dcompiler.lib")
@@ -61,8 +64,8 @@ const unsigned int NUM_SWAP_BUFFERS = 2; //Number of buffers
 
 struct Vertex
 {
-	float x,y,z; // Position
-	float r,g,b; // Color
+	float x,y,z,w; // Position
+	//float r,g,b; // Color
 };
 
 #pragma region Globals
@@ -111,9 +114,13 @@ ID3D12Resource1*		gConstantBufferResource[NUM_SWAP_BUFFERS]		= {};
 
 #pragma region GameState
 
-const int num_of_meshes = 10;
+// TOTAL_TRIS pretty much decides how many drawcalls in a brute force approach.
+constexpr int TOTAL_TRIS = 400;
+// this has to do with how the triangles are spread in the screen, not important.
+constexpr int TOTAL_PLACES = 2 * TOTAL_TRIS*20;
+float xt[TOTAL_PLACES], yt[TOTAL_PLACES];
 
-struct Mesh
+struct TriangleObject
 {
 	//Vertex triangle[3]; // all meshes use the same vertices
 	ConstantBuffer translate;
@@ -122,7 +129,7 @@ struct Mesh
 
 struct GameState
 {
-	std::vector<Mesh> meshes;
+	std::vector<TriangleObject> meshes;
 };
 
 /*
@@ -612,9 +619,12 @@ void CreateShadersAndPiplelineState()
 	);
 
 	////// Input Layout //////
+	//D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {
+	//	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	//	{ "COLOR"	, 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+	//};	
 	D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "COLOR"	, 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 	};
 
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc;
@@ -660,17 +670,24 @@ void CreateShadersAndPiplelineState()
 #pragma region CreateTriangleData
 void CreateTriangleData()
 {
-	Vertex triangleVertices[3] =
-	{
-		0.0f, 0.5f, 0.0f,	//v0 pos
-		1.0f, 0.0f, 0.0f,	//v0 color
-
-		0.5f, -0.5f, 0.0f,	//v1
-		0.0f, 1.0f, 0.0f,	//v1 color
-
-		-0.5f, -0.5f, 0.0f, //v2
-		0.0f, 0.0f, 1.0f	//v2 color
+	Vertex triangleVertices[3] = 
+	{ 
+		{ 0.0f,  0.05f, 0.0f, 1.0f },
+		{ 0.05f, -0.05f, 0.0f, 1.0f },
+		{ -0.05f, -0.05f, 0.0f, 1.0f } 
 	};
+
+	//Vertex triangleVertices[3] =
+	//{
+	//	0.0f, 0.5f, 0.0f,	//v0 pos
+	//	//1.0f, 0.0f, 0.0f,	//v0 color
+
+	//	0.5f, -0.5f, 0.0f,	//v1
+	//	//0.0f, 1.0f, 0.0f,	//v1 color
+
+	//	-0.5f, -0.5f, 0.0f, //v2
+	//	//0.0f, 0.0f, 1.0f	//v2 color
+	//};
 
 	//Note: using upload heaps to transfer static data like vert buffers is not 
     //recommended. Every time the GPU needs it, the upload heap will be marshalled 
@@ -719,12 +736,21 @@ void CreateTriangleData()
 #pragma region CreateMeshes
 void CreateMeshes()
 {
-	float fade = 1.0 / num_of_meshes;
-	for (int i = 0; i < num_of_meshes; ++i) {
-		Mesh m;
+	// create the translation arrays used for moving the triangles around on the screen
+	float degToRad = (float)M_PI / 180.0f;
+	float scale = (float)TOTAL_PLACES / 359.9f;
+	for (int a = 0; a < TOTAL_PLACES; a++)
+	{
+		xt[a] = 0.8f * cosf(degToRad * ((float)a / scale) * 3.0f);
+		yt[a] = 0.8f * sinf(degToRad * ((float)a / scale) * 2.0f);
+	};
+
+	float fade = 1.0f / TOTAL_TRIS;
+	for (int i = 0; i < TOTAL_TRIS; ++i) {
+		TriangleObject m;
 
 		// initialize meshes with greyscale colors
-		float c = 1.0 - fade * i;
+		float c = 1.0f - fade * i;
 		m.color = { c, c, c, 1.0 };
 
 		writeState.meshes.push_back(m);
@@ -733,64 +759,67 @@ void CreateMeshes()
 #pragma endregion
 
 #pragma region Update
+//todo run in CPU thread, no syncronization with render threads needed since it's using a separate GameState
 void Update(int backBufferIndex)
 {
-	//Update color values in constant buffer
-	for (auto &m : writeState.meshes) {
-		for (int i = 0; i < 3; i++)
-		{
-			//gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
-			m.color.values[i] += 0.0001f * (i + 1);
-			if (m.color.values[i] > 1)
+	{
+		int meshInd = 0;
+		static long long shift = 0;
+		for (auto &m : writeState.meshes) {
+			
+			//Update color values in constant buffer
+			for (int i = 0; i < 3; i++)
 			{
-				m.color.values[i] = 0;
+				//gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
+				m.color.values[i] += 0.0001f * (i + 1);
+				if (m.color.values[i] > 1)
+				{
+					m.color.values[i] = 0;
+				}
 			}
-		}
-	}
 
-	//todo
-	//Update translation values in constant buffer
+			//Update positions of each mesh
+			m.translate = ConstantBuffer{
+				xt[(int)(float)(meshInd*10 + shift) % (TOTAL_PLACES)],
+				yt[(int)(float)(meshInd*10 + shift) % (TOTAL_PLACES)],
+				meshInd * (-1.0f / TOTAL_PLACES),
+				0.0f
+			};
+
+			meshInd++;
+		}
+		shift += max((long long)(TOTAL_TRIS / 1000.0), (long long)(TOTAL_TRIS / 100.0));
+	}
 
 
 	// todo mutex lock or something
 	bufferState = writeState;
-
-
-	////Update GPU memory
-	//void* mappedMem = nullptr;
-	//D3D12_RANGE readRange = { 0, 0 }; //We do not intend to read this resource on the CPU.
-	//if (SUCCEEDED(gConstantBufferResource[backBufferIndex]->Map(0, &readRange, &mappedMem)))
-	//{
-	//	//memcpy(mappedMem, &gConstantBufferCPU, sizeof(ConstantBuffer));
-
-	//	D3D12_RANGE writeRange = { 0, sizeof(ConstantBuffer) };
-	//	gConstantBufferResource[backBufferIndex]->Unmap(0, &writeRange);
-	//}
 }
 #pragma endregion
 
 #pragma region Render
+//todo run on GPU thread, no synconization with CPU thread needed since using separate GameState buffer
 void Render(int backBufferIndex)
 {
 	// todo mutex lock or something
 	readOnlyState = bufferState;
 	
-	
+
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 	gCommandAllocator->Reset();
 	gCommandList4->Reset(gCommandAllocator, gPipeLineState);
 
 	//Set constant buffer descriptor heap
-	ID3D12DescriptorHeap* descriptorHeaps[] = { gDescriptorHeap[backBufferIndex] };
-	gCommandList4->SetDescriptorHeaps(ARRAYSIZE(descriptorHeaps), descriptorHeaps);
+	/*ID3D12DescriptorHeap* descriptorHeaps[] = { gDescriptorHeap[backBufferIndex] };
+	gCommandList4->SetDescriptorHeaps(ARRAYSIZE(descriptorHeaps), descriptorHeaps);*/
 	
 	//Set root signature
 	gCommandList4->SetGraphicsRootSignature(gRootSignature);
 
 	//Set root descriptor table to index 0 in previously set root signature
-	gCommandList4->SetGraphicsRootDescriptorTable(0,
-		gDescriptorHeap[backBufferIndex]->GetGPUDescriptorHandleForHeapStart());
+	//gCommandList4->SetGraphicsRootDescriptorTable(0,
+	//	gDescriptorHeap[backBufferIndex]->GetGPUDescriptorHandleForHeapStart());
 
 	//Set necessary states.
 	gCommandList4->RSSetViewports(1, &gViewport);
@@ -817,6 +846,7 @@ void Render(int backBufferIndex)
 	gCommandList4->IASetVertexBuffers(0, 1, &gVertexBufferView);
 
 
+	//Update constant buffers and draw triangles
 	for (auto &m : readOnlyState.meshes) {
 		const void* translateConstant = &m.translate;
 		gCommandList4->SetGraphicsRoot32BitConstants(0, 4, translateConstant, 0);
@@ -826,8 +856,6 @@ void Render(int backBufferIndex)
 
 		gCommandList4->DrawInstanced(3, 1, 0, 0);
 	}
-
-
 
 	
 	//Indicate that the back buffer will now be used to present.
@@ -848,7 +876,10 @@ void Render(int backBufferIndex)
 	DXGI_PRESENT_PARAMETERS pp = {};
 	gSwapChain4->Present1(0, 0, &pp);
 
+
 	WaitForGpu(); //Wait for GPU to finish.
 				  //NOT BEST PRACTICE, only used as such for simplicity.
+
+	// todo create new render thread
 }
 #pragma endregion
