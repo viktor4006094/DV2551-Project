@@ -10,6 +10,8 @@
 #include <dxgi1_6.h> //Only used for initialization of the device and swap chain.
 #include <d3dcompiler.h>
 
+#include <vector>
+
 #pragma comment (lib, "d3d12.lib")
 #pragma comment (lib, "DXGI.lib")
 #pragma comment (lib, "d3dcompiler.lib")
@@ -32,6 +34,8 @@ void CreateShadersAndPiplelineState();						//7. Set up the pipeline state
 void CreateTriangleData();									//8. Create vertexdata
 void CreateRootSignature();
 void CreateConstantBufferResources();
+void CreateMeshes();
+
 
 void	Update(int backBufferIndex);
 void	Render(int backBufferIndex);
@@ -96,13 +100,42 @@ D3D12_VERTEX_BUFFER_VIEW	gVertexBufferView					= {};
 #pragma region ConstantBufferGlobals
 struct ConstantBuffer
 {
-	float colorChannel[4];
+	float values[4];
 };
 
 ID3D12DescriptorHeap*	gDescriptorHeap[NUM_SWAP_BUFFERS]				= {};
 ID3D12Resource1*		gConstantBufferResource[NUM_SWAP_BUFFERS]		= {};
-ConstantBuffer			gConstantBufferCPU								= {};
+//ConstantBuffer			gConstantBufferCPU								= {};
 #pragma endregion
+
+
+#pragma region GameState
+
+const int num_of_meshes = 10;
+
+struct Mesh
+{
+	//Vertex triangle[3]; // all meshes use the same vertices
+	ConstantBuffer translate;
+	ConstantBuffer color;
+};
+
+struct GameState
+{
+	std::vector<Mesh> meshes;
+};
+
+/*
+	CPU updates writeState
+	Once CPU update is done writeState is copied to bufferState
+	Before each new GPU frame the bufferState is copied to readOnlyState which is used by the GPU
+*/
+GameState writeState;
+GameState bufferState;
+GameState readOnlyState;
+
+#pragma endregion
+
 
 #pragma region wwinMain
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
@@ -129,6 +162,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 		CreateConstantBufferResources();					//9. Create constant buffer data
 	
 		CreateTriangleData();								//10. Create vertexdata
+
+		CreateMeshes();										//11. Create meshes (all use same triangle but different constant buffers)
 
 		WaitForGpu();
 		
@@ -185,7 +220,7 @@ HWND InitWindow(HINSTANCE hInstance)//1. Create Window
 	wcex.cbSize			= sizeof(WNDCLASSEX);
 	wcex.lpfnWndProc	= WndProc;
 	wcex.hInstance		= hInstance;
-	wcex.lpszClassName	= L"BTH_D3D_12_DEMO";
+	wcex.lpszClassName	= L"DV2551_Project";
 	if (!RegisterClassEx(&wcex))
 	{
 		return false;
@@ -196,8 +231,8 @@ HWND InitWindow(HINSTANCE hInstance)//1. Create Window
 
 	return CreateWindowEx(
 		WS_EX_OVERLAPPEDWINDOW,
-		L"BTH_D3D_12_DEMO",
-		L"BTH Direct3D 12 Demo",
+		L"DV2551_Project",
+		L"DV2551 JPEG Project",
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,
@@ -496,7 +531,7 @@ void CreateRootSignature()
 {
 	//define descriptor range(s)
 	D3D12_DESCRIPTOR_RANGE  dtRanges[1];
-	dtRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+	dtRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	dtRanges[0].NumDescriptors = 1; //only one CB in this example
 	dtRanges[0].BaseShaderRegister = 0; //register b0
 	dtRanges[0].RegisterSpace = 0; //register(b0,space0);
@@ -508,10 +543,17 @@ void CreateRootSignature()
 	dt.pDescriptorRanges = dtRanges;
 
 	//create root parameter
-	D3D12_ROOT_PARAMETER  rootParam[1];
-	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam[0].DescriptorTable = dt;
+	D3D12_ROOT_PARAMETER rootParam[2];
+
+	// constant translate 
+	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+	rootParam[0].Constants = { 0, 0, 4 }; // 4 constants in b0 first register space
 	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+	// constant color
+	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+	rootParam[1].Constants = { 1, 0, 4 }; // 4 constants in b0 first register space
+	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
 	D3D12_ROOT_SIGNATURE_DESC rsDesc;
 	rsDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
@@ -674,35 +716,66 @@ void CreateTriangleData()
 }
 #pragma endregion
 
+#pragma region CreateMeshes
+void CreateMeshes()
+{
+	float fade = 1.0 / num_of_meshes;
+	for (int i = 0; i < num_of_meshes; ++i) {
+		Mesh m;
+
+		// initialize meshes with greyscale colors
+		float c = 1.0 - fade * i;
+		m.color = { c, c, c, 1.0 };
+
+		writeState.meshes.push_back(m);
+	}
+}
+#pragma endregion
+
 #pragma region Update
 void Update(int backBufferIndex)
 {
 	//Update color values in constant buffer
-	for (int i = 0; i < 3; i++)
-	{
-		gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
-		if (gConstantBufferCPU.colorChannel[i] > 1)
+	for (auto &m : writeState.meshes) {
+		for (int i = 0; i < 3; i++)
 		{
-			gConstantBufferCPU.colorChannel[i] = 0;
+			//gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
+			m.color.values[i] += 0.0001f * (i + 1);
+			if (m.color.values[i] > 1)
+			{
+				m.color.values[i] = 0;
+			}
 		}
 	}
 
-	//Update GPU memory
-	void* mappedMem = nullptr;
-	D3D12_RANGE readRange = { 0, 0 }; //We do not intend to read this resource on the CPU.
-	if (SUCCEEDED(gConstantBufferResource[backBufferIndex]->Map(0, &readRange, &mappedMem)))
-	{
-		memcpy(mappedMem, &gConstantBufferCPU, sizeof(ConstantBuffer));
+	//todo
+	//Update translation values in constant buffer
 
-		D3D12_RANGE writeRange = { 0, sizeof(ConstantBuffer) };
-		gConstantBufferResource[backBufferIndex]->Unmap(0, &writeRange);
-	}
+
+	// todo mutex lock or something
+	bufferState = writeState;
+
+
+	////Update GPU memory
+	//void* mappedMem = nullptr;
+	//D3D12_RANGE readRange = { 0, 0 }; //We do not intend to read this resource on the CPU.
+	//if (SUCCEEDED(gConstantBufferResource[backBufferIndex]->Map(0, &readRange, &mappedMem)))
+	//{
+	//	//memcpy(mappedMem, &gConstantBufferCPU, sizeof(ConstantBuffer));
+
+	//	D3D12_RANGE writeRange = { 0, sizeof(ConstantBuffer) };
+	//	gConstantBufferResource[backBufferIndex]->Unmap(0, &writeRange);
+	//}
 }
 #pragma endregion
 
 #pragma region Render
 void Render(int backBufferIndex)
 {
+	// todo mutex lock or something
+	readOnlyState = bufferState;
+	
+	
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 	gCommandAllocator->Reset();
@@ -743,7 +816,19 @@ void Render(int backBufferIndex)
 	gCommandList4->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	gCommandList4->IASetVertexBuffers(0, 1, &gVertexBufferView);
 
-	gCommandList4->DrawInstanced(3, 1, 0, 0);
+
+	for (auto &m : readOnlyState.meshes) {
+		const void* translateConstant = &m.translate;
+		gCommandList4->SetGraphicsRoot32BitConstants(0, 4, translateConstant, 0);
+
+		const void* colorConstant = &m.color;
+		gCommandList4->SetGraphicsRoot32BitConstants(1, 4, colorConstant, 0);
+
+		gCommandList4->DrawInstanced(3, 1, 0, 0);
+	}
+
+
+
 	
 	//Indicate that the back buffer will now be used to present.
 	SetResourceTransitionBarrier(gCommandList4,
