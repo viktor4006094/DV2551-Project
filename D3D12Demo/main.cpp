@@ -5,94 +5,24 @@
 // 180129: Stefan Petersson, cleanups/updates DXGI 1.5
 // 181009: Stefan Petersson, cleanups/updates DXGI 1.6
 //--------------------------------------------------------------------------------------
-#include <windows.h>
-#include <d3d12.h>
-#include <dxgi1_6.h> //Only used for initialization of the device and swap chain.
-#include <d3dcompiler.h>
 
+#include "main.hpp"
 #include <thread>
 #include <mutex>
 #include <vector>
 
-#define _USE_MATH_DEFINES
-#include <math.h>
-
-#pragma comment (lib, "d3d12.lib")
-#pragma comment (lib, "DXGI.lib")
-#pragma comment (lib, "d3dcompiler.lib")
-
-#pragma region Forward Declarations
-
-HWND				InitWindow(HINSTANCE hInstance);	//1. Create Window
-LRESULT CALLBACK	WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-//Helper function for syncronization of GPU/CPU
-void WaitForGpu();
-//Helper function for resource transitions
-
-void CreateDirect3DDevice(HWND wndHandle);				//2. Create Device
-void CreateCommandInterfacesAndSwapChain(HWND wndHandle);	//3. Create CommandQueue and SwapChain
-void CreateFenceAndEventHandle();							//4. Create Fence and Event handle
-void CreateRenderTargets();									//5. Create render targets for backbuffer
-void CreateViewportAndScissorRect();						//6. Create viewport and rect
-void CreateShadersAndPiplelineState();						//7. Set up the pipeline state
-void CreateTriangleData();									//8. Create vertexdata
-void CreateRootSignature();
-void CreateConstantBufferResources();
-void CreateMeshes();
 
 
-void	Update();
-void	Render();
-
-#pragma endregion
-
-template<class Interface>
-inline void SafeRelease(
-	Interface **ppInterfaceToRelease)
-{
-	if (*ppInterfaceToRelease != NULL)
-	{
-		(*ppInterfaceToRelease)->Release();
-
-		(*ppInterfaceToRelease) = NULL;
-	}
-}
-
-const unsigned int SCREEN_WIDTH = 640; //Width of application.
-const unsigned int SCREEN_HEIGHT = 480;	//Height of application.
-
-const unsigned int NUM_SWAP_BUFFERS = 2; //Number of buffers
-
+#pragma region structs
 struct Vertex
 {
 	float x,y,z,w; // Position
 	//float r,g,b; // Color
 };
 
-#pragma region Globals
-#ifdef VETTIG_DATOR
-ID3D12Device5*				gDevice5							= nullptr;
-ID3D12GraphicsCommandList4*	gCommandList4 = nullptr;
-#else
-ID3D12Device4*				gDevice5 = nullptr;
-ID3D12GraphicsCommandList3*	gCommandList4 = nullptr;
-#endif
-ID3D12CommandQueue*			gCommandQueue						= nullptr;
-ID3D12CommandAllocator*		gCommandAllocator					= nullptr;
-IDXGISwapChain4*			gSwapChain4							= nullptr;
 
-ID3D12Fence1*				gFence								= nullptr;
-HANDLE						gEventHandle						= nullptr;
-UINT64						gFenceValue							= 0;
 
-ID3D12DescriptorHeap*		gRenderTargetsHeap					= nullptr;
-ID3D12Resource1*			gRenderTargets[NUM_SWAP_BUFFERS]	= {};
-UINT						gRenderTargetDescriptorSize			= 0;
-//UINT						gFrameIndex							= 0;
 
-D3D12_VIEWPORT				gViewport							= {};
-D3D12_RECT					gScissorRect						= {};
 
 ID3D12RootSignature*		gRootSignature						= nullptr;
 ID3D12PipelineState*		gPipeLineState						= nullptr;
@@ -177,7 +107,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
 		CreateMeshes();										//11. Create meshes (all use same triangle but different constant buffers)
 
-		WaitForGpu();
+		//todo
+		//WaitForGpu();
 		
 		std::thread(Update).detach();
 		std::thread(Render).detach();
@@ -207,12 +138,29 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 	WaitForGpu();
 	CloseHandle(gEventHandle);
 	SafeRelease(&gDevice5);		
-	SafeRelease(&gCommandQueue);
-	SafeRelease(&gCommandAllocator);
-	SafeRelease(&gCommandList4);
+
+	gCommandQueues[0].Release();
+	gCommandQueues[1].Release();
+	gCommandQueues[2].Release();
+
+	gAllocatorsAndLists[0].Release();
+	gAllocatorsAndLists[1].Release();
+	gAllocatorsAndLists[2].Release();
+
+	//gGraphicsQueue.Release();
+	//gCopyQueue.Release();
+	//gComputeQueue.Release();
+
+	//SafeRelease(&gGraphicsQueue);
+	//SafeRelease(&gCopyQueue);
+	//SafeRelease(&gComputeQueue);
+	//SafeRelease(&gCommandAllocator);
+	//SafeRelease(&gGraphicsCommandList);
+	//SafeRelease(&gCopyCommandList);
+	//SafeRelease(&gComputeCommandList);
 	SafeRelease(&gSwapChain4);
 
-	SafeRelease(&gFence);
+	//SafeRelease(&gFence);
 
 	SafeRelease(&gRenderTargetsHeap);
 	for (int i = 0; i < NUM_SWAP_BUFFERS; i++)
@@ -278,23 +226,27 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 #pragma endregion
 
 #pragma region WaitForGpu
-void WaitForGpu()
+void WaitForGpu(QueueType type)
 {
-	//WAITING FOR EACH FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
-	//This is code implemented as such for simplicity. The cpu could for example be used
-	//for other tasks to prepare the next frame while the current one is being rendered.
+	gCommandQueues[type].WaitForGpu();
 
-	//Signal and increment the fence value.
-	const UINT64 fence = gFenceValue;
-	gCommandQueue->Signal(gFence, fence);
-	gFenceValue++;
-	
-	//Wait until command queue is done.
-	if(gFence->GetCompletedValue() < fence)
-	{
-		gFence->SetEventOnCompletion(fence, gEventHandle);
-		WaitForSingleObject(gEventHandle, INFINITE);
-	}
+	////WAITING FOR EACH FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
+	////This is code implemented as such for simplicity. The cpu could for example be used
+	////for other tasks to prepare the next frame while the current one is being rendered.
+
+	////Signal and increment the fence value.
+	//const UINT64 fence = gFenceValue;
+
+	//gCommandQueue->Signal(gFence, fence);
+	//
+	//gFenceValue++;
+	//
+	////Wait until command queue is done.
+	//if(gFence->GetCompletedValue() < fence)
+	//{
+	//	gFence->SetEventOnCompletion(fence, gEventHandle);
+	//	WaitForSingleObject(gEventHandle, INFINITE);
+	//}
 }
 #pragma endregion
 
@@ -384,25 +336,26 @@ void CreateDirect3DDevice(HWND wndHandle)
 #pragma region CreateCommandInterfacesAndSwapChain
 void CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 {
-	//Describe and create the command queue.
+	//Describe and create the command queues.
 	D3D12_COMMAND_QUEUE_DESC cqd = {};
-	gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueue));
+
+	cqd.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+	gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QUEUE_TYPE_DIRECT].mQueue));
+
+	cqd.Type = D3D12_COMMAND_LIST_TYPE_COPY;
+	gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QUEUE_TYPE_COPY].mQueue));
+
+	cqd.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+	gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue));
+	
 
 	//Create command allocator. The command allocator object corresponds
 	//to the underlying allocations in which GPU commands are stored.
-	gDevice5->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&gCommandAllocator));
-	
 	//Create command list.
-	gDevice5->CreateCommandList(
-		0,
-		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		gCommandAllocator,
-		nullptr,
-		IID_PPV_ARGS(&gCommandList4));
+	gAllocatorsAndLists[0].CreateCommandListAndAllocator(QUEUE_TYPE_DIRECT);
+	gAllocatorsAndLists[1].CreateCommandListAndAllocator(QUEUE_TYPE_COPY);
+	gAllocatorsAndLists[2].CreateCommandListAndAllocator(QUEUE_TYPE_COMPUTE);
 
-	//Command lists are created in the recording state. Since there is nothing to
-	//record right now and the main loop expects it to be closed, we close it.
-	gCommandList4->Close();
 
 	IDXGIFactory5*	factory = nullptr;
 	CreateDXGIFactory(IID_PPV_ARGS(&factory));
@@ -424,7 +377,7 @@ void CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 
 	IDXGISwapChain1* swapChain1 = nullptr;
 	if (SUCCEEDED(factory->CreateSwapChainForHwnd(
-		gCommandQueue,
+		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue,
 		wndHandle,
 		&scDesc,
 		nullptr,
@@ -444,10 +397,9 @@ void CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 #pragma region CreateFenceAndEventHandle
 void CreateFenceAndEventHandle()
 {
-	gDevice5->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gFence));
-	gFenceValue		= 1;
-	//Create an event handle to use for GPU synchronization.
-	gEventHandle	= CreateEvent(0, false, false, 0);
+	gCommandQueues[QUEUE_TYPE_DIRECT].CreateFenceAndEventHandle();
+	gCommandQueues[QUEUE_TYPE_COPY].CreateFenceAndEventHandle();
+	gCommandQueues[QUEUE_TYPE_COMPUTE].CreateFenceAndEventHandle();
 }
 #pragma endregion
 
@@ -831,81 +783,88 @@ void Render()
 		bufferTransferLock.unlock();
 		UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 
-		//Command list allocators can only be reset when the associated command lists have
-		//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
-		gCommandAllocator->Reset();
-		gCommandList4->Reset(gCommandAllocator, gPipeLineState);
+	//Command list allocators can only be reset when the associated command lists have
+	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
+	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[QUEUE_TYPE_DIRECT].mAllocator;
+#ifdef VETTIG_DATOR
+	ID3D12GraphicsCommandList4*	commandList = gAllocatorsAndLists[QUEUE_TYPE_DIRECT].mCommandList;
+#else
+	ID3D12GraphicsCommandList3*	directList = gAllocatorsAndLists[QUEUE_TYPE_DIRECT].mCommandList;
+#endif
 
-		//Set constant buffer descriptor heap
-		/*ID3D12DescriptorHeap* descriptorHeaps[] = { gDescriptorHeap[backBufferIndex] };
-		gCommandList4->SetDescriptorHeaps(ARRAYSIZE(descriptorHeaps), descriptorHeaps);*/
+	directAllocator->Reset();
+	directList->Reset(directAllocator, gPipeLineState);
 
-		//Set root signature
-		gCommandList4->SetGraphicsRootSignature(gRootSignature);
+	//Set constant buffer descriptor heap
+	/*ID3D12DescriptorHeap* descriptorHeaps[] = { gDescriptorHeap[backBufferIndex] };
+	gCommandList4->SetDescriptorHeaps(ARRAYSIZE(descriptorHeaps), descriptorHeaps);*/
+	
+	//Set root signature
+	directList->SetGraphicsRootSignature(gRootSignature);
 
 		//Set root descriptor table to index 0 in previously set root signature
 		//gCommandList4->SetGraphicsRootDescriptorTable(0,
 		//	gDescriptorHeap[backBufferIndex]->GetGPUDescriptorHandleForHeapStart());
 
-		//Set necessary states.
-		gCommandList4->RSSetViewports(1, &gViewport);
-		gCommandList4->RSSetScissorRects(1, &gScissorRect);
+	//Set necessary states.
+	directList->RSSetViewports(1, &gViewport);
+	directList->RSSetScissorRects(1, &gScissorRect);
 
-		//Indicate that the back buffer will be used as render target.
-		SetResourceTransitionBarrier(gCommandList4,
-			gRenderTargets[backBufferIndex],
-			D3D12_RESOURCE_STATE_PRESENT,		//state before
-			D3D12_RESOURCE_STATE_RENDER_TARGET	//state after
-		);
+	//Indicate that the back buffer will be used as render target.
+	SetResourceTransitionBarrier(directList,
+		gRenderTargets[backBufferIndex],
+		D3D12_RESOURCE_STATE_PRESENT,		//state before
+		D3D12_RESOURCE_STATE_RENDER_TARGET	//state after
+	);
+	
+	//Record commands.
+	//Get the handle for the current render target used as back buffer.
+	D3D12_CPU_DESCRIPTOR_HANDLE cdh = gRenderTargetsHeap->GetCPUDescriptorHandleForHeapStart();
+	cdh.ptr += gRenderTargetDescriptorSize * backBufferIndex;
 
-		//Record commands.
-		//Get the handle for the current render target used as back buffer.
-		D3D12_CPU_DESCRIPTOR_HANDLE cdh = gRenderTargetsHeap->GetCPUDescriptorHandleForHeapStart();
-		cdh.ptr += gRenderTargetDescriptorSize * backBufferIndex;
-
-		gCommandList4->OMSetRenderTargets(1, &cdh, true, nullptr);
-
-		float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
-		gCommandList4->ClearRenderTargetView(cdh, clearColor, 0, nullptr);
-
-		gCommandList4->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		gCommandList4->IASetVertexBuffers(0, 1, &gVertexBufferView);
-
-
-		//Update constant buffers and draw triangles
-		for (auto &m : readOnlyState.meshes) {
-			const void* translateConstant = &m.translate;
-			gCommandList4->SetGraphicsRoot32BitConstants(0, 4, translateConstant, 0);
-			const void* colorConstant = &m.color;
-			gCommandList4->SetGraphicsRoot32BitConstants(1, 4, colorConstant, 0);
-
-			gCommandList4->DrawInstanced(3, 1, 0, 0);
-		}
+	directList->OMSetRenderTargets(1, &cdh, true, nullptr);
+	
+	float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
+	directList->ClearRenderTargetView(cdh, clearColor, 0, nullptr);
+	
+	directList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	directList->IASetVertexBuffers(0, 1, &gVertexBufferView);
 
 
-		//Indicate that the back buffer will now be used to present.
-		SetResourceTransitionBarrier(gCommandList4,
-			gRenderTargets[backBufferIndex],
-			D3D12_RESOURCE_STATE_RENDER_TARGET,	//state before
-			D3D12_RESOURCE_STATE_PRESENT		//state after
-		);
+	//Update constant buffers and draw triangles
+	for (auto &m : readOnlyState.meshes) {
+		const void* translateConstant = &m.translate;
+		directList->SetGraphicsRoot32BitConstants(0, 4, translateConstant, 0);
 
-		//Close the list to prepare it for execution.
-		gCommandList4->Close();
+		const void* colorConstant = &m.color;
+		directList->SetGraphicsRoot32BitConstants(1, 4, colorConstant, 0);
 
-		// todo Wáit for GPU here
+		directList->DrawInstanced(3, 1, 0, 0);
+	}
 
-		//Execute the command list.
-		ID3D12CommandList* listsToExecute[] = { gCommandList4 };
-		gCommandQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
+	
+	//Indicate that the back buffer will now be used to present.
+	SetResourceTransitionBarrier(directList,
+		gRenderTargets[backBufferIndex],
+		D3D12_RESOURCE_STATE_RENDER_TARGET,	//state before
+		D3D12_RESOURCE_STATE_PRESENT		//state after
+	);
+	
+	//Close the list to prepare it for execution.
+	directList->Close();
+
+	//Execute the command list.
+	ID3D12CommandList* listsToExecute[] = { directList };
+	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
 
 		//Present the frame.
 		DXGI_PRESENT_PARAMETERS pp = {};
 		gSwapChain4->Present1(0, 0, &pp);
 
+	gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 
-		WaitForGpu(); //Wait for GPU to finish.
-					  //NOT BEST PRACTICE, only used as such for simplicity.
+	WaitForGpu(); //Wait for GPU to finish.
+				  //NOT BEST PRACTICE, only used as such for simplicity.
 
 		// todo create new render thread
 		std::thread(Render).detach();
