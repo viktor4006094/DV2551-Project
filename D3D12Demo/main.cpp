@@ -10,6 +10,7 @@
 #include <dxgi1_6.h> //Only used for initialization of the device and swap chain.
 #include <d3dcompiler.h>
 
+#include <thread>
 #include <vector>
 
 #define _USE_MATH_DEFINES
@@ -98,6 +99,8 @@ ID3D12PipelineState*		gPipeLineState						= nullptr;
 ID3D12Resource1*			gVertexBufferResource				= nullptr;
 D3D12_VERTEX_BUFFER_VIEW	gVertexBufferView					= {};
 
+bool isRunning = true;
+
 #pragma endregion
 
 #pragma region ConstantBufferGlobals
@@ -149,7 +152,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 {
 	MSG msg			= {0};
 	HWND wndHandle	= InitWindow(hInstance);			//1. Create Window
-	
+	std::thread threadArray[2];
 	if(wndHandle)
 	{
 		CreateDirect3DDevice(wndHandle);					//2. Create Device
@@ -174,6 +177,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
 		WaitForGpu();
 		
+		threadArray[0] = std::thread(Update);
+		threadArray[1] = std::thread(Render);
+
 		ShowWindow(wndHandle, nCmdShow);
 		while(WM_QUIT != msg.message)
 		{
@@ -181,16 +187,20 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 			{
 				TranslateMessage(&msg);
 				DispatchMessage(&msg);
+				
 			}
 			else
 			{
 				//moved to Render
 				//UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 
-				Update();
-				Render();
+				//Update();
+				//Render();
 			}
 		}
+		isRunning = false;
+		threadArray[0].join();
+		threadArray[1].join();
 	}
 	
 	//Wait for GPU execution to be done and then release all interfaces.
@@ -763,38 +773,41 @@ void CreateMeshes()
 //todo run in CPU thread, no syncronization with render threads needed since it's using a separate GameState
 void Update()
 {
-	{
-		int meshInd = 0;
-		static long long shift = 0;
-		for (auto &m : writeState.meshes) {
-			
-			//Update color values in constant buffer
-			for (int i = 0; i < 3; i++)
-			{
-				//gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
-				m.color.values[i] += 0.0001f * (i + 1);
-				if (m.color.values[i] > 1)
+	while (isRunning) {
+
+		{
+			int meshInd = 0;
+			static long long shift = 0;
+			for (auto &m : writeState.meshes) {
+
+				//Update color values in constant buffer
+				for (int i = 0; i < 3; i++)
 				{
-					m.color.values[i] = 0;
+					//gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
+					m.color.values[i] += 0.0001f * (i + 1);
+					if (m.color.values[i] > 1)
+					{
+						m.color.values[i] = 0;
+					}
 				}
+
+				//Update positions of each mesh
+				m.translate = ConstantBuffer{
+					xt[(int)(float)(meshInd * 10 + shift) % (TOTAL_PLACES)],
+					yt[(int)(float)(meshInd * 10 + shift) % (TOTAL_PLACES)],
+					meshInd * (-1.0f / TOTAL_PLACES),
+					0.0f
+				};
+
+				meshInd++;
 			}
-
-			//Update positions of each mesh
-			m.translate = ConstantBuffer{
-				xt[(int)(float)(meshInd*10 + shift) % (TOTAL_PLACES)],
-				yt[(int)(float)(meshInd*10 + shift) % (TOTAL_PLACES)],
-				meshInd * (-1.0f / TOTAL_PLACES),
-				0.0f
-			};
-
-			meshInd++;
+			shift += max((long long)(TOTAL_TRIS / 1000.0), (long long)(TOTAL_TRIS / 100.0));
 		}
-		shift += max((long long)(TOTAL_TRIS / 1000.0), (long long)(TOTAL_TRIS / 100.0));
+
+
+		// todo mutex lock or something
+		bufferState = writeState;
 	}
-
-
-	// todo mutex lock or something
-	bufferState = writeState;
 }
 #pragma endregion
 
@@ -802,86 +815,88 @@ void Update()
 //todo run on GPU thread, no synconization with CPU thread needed since using separate GameState buffer
 void Render()
 {
-	// todo mutex lock or something
-	readOnlyState = bufferState;
-	
-	UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
+	while (isRunning) {
+		// todo mutex lock or something
+		readOnlyState = bufferState;
 
-	//Command list allocators can only be reset when the associated command lists have
-	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
-	gCommandAllocator->Reset();
-	gCommandList4->Reset(gCommandAllocator, gPipeLineState);
+		UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 
-	//Set constant buffer descriptor heap
-	/*ID3D12DescriptorHeap* descriptorHeaps[] = { gDescriptorHeap[backBufferIndex] };
-	gCommandList4->SetDescriptorHeaps(ARRAYSIZE(descriptorHeaps), descriptorHeaps);*/
-	
-	//Set root signature
-	gCommandList4->SetGraphicsRootSignature(gRootSignature);
+		//Command list allocators can only be reset when the associated command lists have
+		//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
+		gCommandAllocator->Reset();
+		gCommandList4->Reset(gCommandAllocator, gPipeLineState);
 
-	//Set root descriptor table to index 0 in previously set root signature
-	//gCommandList4->SetGraphicsRootDescriptorTable(0,
-	//	gDescriptorHeap[backBufferIndex]->GetGPUDescriptorHandleForHeapStart());
+		//Set constant buffer descriptor heap
+		/*ID3D12DescriptorHeap* descriptorHeaps[] = { gDescriptorHeap[backBufferIndex] };
+		gCommandList4->SetDescriptorHeaps(ARRAYSIZE(descriptorHeaps), descriptorHeaps);*/
 
-	//Set necessary states.
-	gCommandList4->RSSetViewports(1, &gViewport);
-	gCommandList4->RSSetScissorRects(1, &gScissorRect);
+		//Set root signature
+		gCommandList4->SetGraphicsRootSignature(gRootSignature);
 
-	//Indicate that the back buffer will be used as render target.
-	SetResourceTransitionBarrier(gCommandList4,
-		gRenderTargets[backBufferIndex],
-		D3D12_RESOURCE_STATE_PRESENT,		//state before
-		D3D12_RESOURCE_STATE_RENDER_TARGET	//state after
-	);
-	
-	//Record commands.
-	//Get the handle for the current render target used as back buffer.
-	D3D12_CPU_DESCRIPTOR_HANDLE cdh = gRenderTargetsHeap->GetCPUDescriptorHandleForHeapStart();
-	cdh.ptr += gRenderTargetDescriptorSize * backBufferIndex;
+		//Set root descriptor table to index 0 in previously set root signature
+		//gCommandList4->SetGraphicsRootDescriptorTable(0,
+		//	gDescriptorHeap[backBufferIndex]->GetGPUDescriptorHandleForHeapStart());
 
-	gCommandList4->OMSetRenderTargets(1, &cdh, true, nullptr);
-	
-	float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
-	gCommandList4->ClearRenderTargetView(cdh, clearColor, 0, nullptr);
-	
-	gCommandList4->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	gCommandList4->IASetVertexBuffers(0, 1, &gVertexBufferView);
+		//Set necessary states.
+		gCommandList4->RSSetViewports(1, &gViewport);
+		gCommandList4->RSSetScissorRects(1, &gScissorRect);
+
+		//Indicate that the back buffer will be used as render target.
+		SetResourceTransitionBarrier(gCommandList4,
+			gRenderTargets[backBufferIndex],
+			D3D12_RESOURCE_STATE_PRESENT,		//state before
+			D3D12_RESOURCE_STATE_RENDER_TARGET	//state after
+		);
+
+		//Record commands.
+		//Get the handle for the current render target used as back buffer.
+		D3D12_CPU_DESCRIPTOR_HANDLE cdh = gRenderTargetsHeap->GetCPUDescriptorHandleForHeapStart();
+		cdh.ptr += gRenderTargetDescriptorSize * backBufferIndex;
+
+		gCommandList4->OMSetRenderTargets(1, &cdh, true, nullptr);
+
+		float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
+		gCommandList4->ClearRenderTargetView(cdh, clearColor, 0, nullptr);
+
+		gCommandList4->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		gCommandList4->IASetVertexBuffers(0, 1, &gVertexBufferView);
 
 
-	//Update constant buffers and draw triangles
-	for (auto &m : readOnlyState.meshes) {
-		const void* translateConstant = &m.translate;
-		gCommandList4->SetGraphicsRoot32BitConstants(0, 4, translateConstant, 0);
+		//Update constant buffers and draw triangles
+		for (auto &m : readOnlyState.meshes) {
+			const void* translateConstant = &m.translate;
+			gCommandList4->SetGraphicsRoot32BitConstants(0, 4, translateConstant, 0);
 
-		const void* colorConstant = &m.color;
-		gCommandList4->SetGraphicsRoot32BitConstants(1, 4, colorConstant, 0);
+			const void* colorConstant = &m.color;
+			gCommandList4->SetGraphicsRoot32BitConstants(1, 4, colorConstant, 0);
 
-		gCommandList4->DrawInstanced(3, 1, 0, 0);
+			gCommandList4->DrawInstanced(3, 1, 0, 0);
+		}
+
+
+		//Indicate that the back buffer will now be used to present.
+		SetResourceTransitionBarrier(gCommandList4,
+			gRenderTargets[backBufferIndex],
+			D3D12_RESOURCE_STATE_RENDER_TARGET,	//state before
+			D3D12_RESOURCE_STATE_PRESENT		//state after
+		);
+
+		//Close the list to prepare it for execution.
+		gCommandList4->Close();
+
+		//Execute the command list.
+		ID3D12CommandList* listsToExecute[] = { gCommandList4 };
+		gCommandQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
+
+		//Present the frame.
+		DXGI_PRESENT_PARAMETERS pp = {};
+		gSwapChain4->Present1(0, 0, &pp);
+
+
+		WaitForGpu(); //Wait for GPU to finish.
+					  //NOT BEST PRACTICE, only used as such for simplicity.
+
+		// todo create new render thread
 	}
-
-	
-	//Indicate that the back buffer will now be used to present.
-	SetResourceTransitionBarrier(gCommandList4,
-		gRenderTargets[backBufferIndex],
-		D3D12_RESOURCE_STATE_RENDER_TARGET,	//state before
-		D3D12_RESOURCE_STATE_PRESENT		//state after
-	);
-	
-	//Close the list to prepare it for execution.
-	gCommandList4->Close();
-
-	//Execute the command list.
-	ID3D12CommandList* listsToExecute[] = { gCommandList4 };
-	gCommandQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
-
-	//Present the frame.
-	DXGI_PRESENT_PARAMETERS pp = {};
-	gSwapChain4->Present1(0, 0, &pp);
-
-
-	WaitForGpu(); //Wait for GPU to finish.
-				  //NOT BEST PRACTICE, only used as such for simplicity.
-
-	// todo create new render thread
 }
 #pragma endregion
