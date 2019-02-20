@@ -11,6 +11,7 @@
 #include <d3dcompiler.h>
 
 #include <thread>
+#include <mutex>
 #include <vector>
 
 #define _USE_MATH_DEFINES
@@ -100,7 +101,9 @@ ID3D12Resource1*			gVertexBufferResource				= nullptr;
 D3D12_VERTEX_BUFFER_VIEW	gVertexBufferView					= {};
 
 bool isRunning = true;
-
+std::mutex threadIDIndexLock;
+std::mutex bufferTransferLock;
+#define MAX_THREAD_COUNT 5
 #pragma endregion
 
 #pragma region ConstantBufferGlobals
@@ -152,7 +155,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 {
 	MSG msg			= {0};
 	HWND wndHandle	= InitWindow(hInstance);			//1. Create Window
-	std::thread threadArray[2];
 	if(wndHandle)
 	{
 		CreateDirect3DDevice(wndHandle);					//2. Create Device
@@ -177,9 +179,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
 		WaitForGpu();
 		
-		threadArray[0] = std::thread(Update);
-		threadArray[1] = std::thread(Render);
-
+		std::thread(Update).detach();
+		std::thread(Render).detach();
 		ShowWindow(wndHandle, nCmdShow);
 		while(WM_QUIT != msg.message)
 		{
@@ -199,11 +200,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 			}
 		}
 		isRunning = false;
-		threadArray[0].join();
-		threadArray[1].join();
 	}
 	
 	//Wait for GPU execution to be done and then release all interfaces.
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
 	WaitForGpu();
 	CloseHandle(gEventHandle);
 	SafeRelease(&gDevice5);		
@@ -806,7 +806,9 @@ void Update()
 
 
 		// todo mutex lock or something
+		bufferTransferLock.lock();
 		bufferState = writeState;
+		bufferTransferLock.unlock();
 	}
 }
 #pragma endregion
@@ -815,10 +817,18 @@ void Update()
 //todo run on GPU thread, no synconization with CPU thread needed since using separate GameState buffer
 void Render()
 {
-	while (isRunning) {
-		// todo mutex lock or something
-		readOnlyState = bufferState;
+	static size_t lastThreadIndex = 0;
 
+	if (isRunning) {
+		thread_local int index;
+		threadIDIndexLock.lock();
+		index = lastThreadIndex;
+		lastThreadIndex = (lastThreadIndex++) % MAX_THREAD_COUNT;
+		threadIDIndexLock.unlock();
+		// todo mutex lock or something
+		bufferTransferLock.lock();
+		readOnlyState = bufferState;
+		bufferTransferLock.unlock();
 		UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 
 		//Command list allocators can only be reset when the associated command lists have
@@ -866,7 +876,6 @@ void Render()
 		for (auto &m : readOnlyState.meshes) {
 			const void* translateConstant = &m.translate;
 			gCommandList4->SetGraphicsRoot32BitConstants(0, 4, translateConstant, 0);
-
 			const void* colorConstant = &m.color;
 			gCommandList4->SetGraphicsRoot32BitConstants(1, 4, colorConstant, 0);
 
@@ -884,6 +893,8 @@ void Render()
 		//Close the list to prepare it for execution.
 		gCommandList4->Close();
 
+		// todo Wáit for GPU here
+
 		//Execute the command list.
 		ID3D12CommandList* listsToExecute[] = { gCommandList4 };
 		gCommandQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
@@ -897,6 +908,7 @@ void Render()
 					  //NOT BEST PRACTICE, only used as such for simplicity.
 
 		// todo create new render thread
+		std::thread(Render).detach();
 	}
 }
 #pragma endregion
