@@ -40,8 +40,8 @@ void CreateConstantBufferResources();
 void CreateMeshes();
 
 
-void	Update(int backBufferIndex);
-void	Render(int backBufferIndex);
+void	Update();
+void	Render();
 
 #pragma endregion
 
@@ -184,10 +184,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 			}
 			else
 			{
-				UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
+				//moved to Render
+				//UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 
-				Update(backBufferIndex);
-				Render(backBufferIndex);
+				Update();
+				Render();
 			}
 		}
 	}
@@ -760,7 +761,7 @@ void CreateMeshes()
 
 #pragma region Update
 //todo run in CPU thread, no syncronization with render threads needed since it's using a separate GameState
-void Update(int backBufferIndex)
+void Update()
 {
 	{
 		int meshInd = 0;
@@ -799,11 +800,12 @@ void Update(int backBufferIndex)
 
 #pragma region Render
 //todo run on GPU thread, no synconization with CPU thread needed since using separate GameState buffer
-void Render(int backBufferIndex)
+void Render()
 {
 	// todo mutex lock or something
 	readOnlyState = bufferState;
 	
+	UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
