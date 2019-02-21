@@ -33,7 +33,7 @@ std::mutex bufferTransferLock;
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
 	MSG msg			= {0};
-	HWND wndHandle	= InitWindow(hInstance);			//1. Create Window
+	wndHandle	= InitWindow(hInstance);			//1. Create Window
 	if(wndHandle)
 	{
 		CreateDirect3DDevice(wndHandle);					//2. Create Device
@@ -93,9 +93,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 	gCommandQueues[1].Release();
 	gCommandQueues[2].Release();
 
-	gAllocatorsAndLists[0].Release();
-	gAllocatorsAndLists[1].Release();
-	gAllocatorsAndLists[2].Release();
+	for (int i = 0; i < MAX_THREAD_COUNT; ++i) {
+		gAllocatorsAndLists[i][0].Release();
+		gAllocatorsAndLists[i][1].Release();
+		gAllocatorsAndLists[i][2].Release();
+	}
 
 	//gGraphicsQueue.Release();
 	//gCopyQueue.Release();
@@ -302,10 +304,11 @@ void CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 	//Create command allocator. The command allocator object corresponds
 	//to the underlying allocations in which GPU commands are stored.
 	//Create command list.
-	gAllocatorsAndLists[0].CreateCommandListAndAllocator(QUEUE_TYPE_DIRECT);
-	gAllocatorsAndLists[1].CreateCommandListAndAllocator(QUEUE_TYPE_COPY);
-	gAllocatorsAndLists[2].CreateCommandListAndAllocator(QUEUE_TYPE_COMPUTE);
-
+	for (int i = 0; i < MAX_THREAD_COUNT; ++i) {
+		gAllocatorsAndLists[i][0].CreateCommandListAndAllocator(QUEUE_TYPE_DIRECT);
+		gAllocatorsAndLists[i][1].CreateCommandListAndAllocator(QUEUE_TYPE_COPY);
+		gAllocatorsAndLists[i][2].CreateCommandListAndAllocator(QUEUE_TYPE_COMPUTE);
+	}
 
 	IDXGIFactory5*	factory = nullptr;
 	CreateDXGIFactory(IID_PPV_ARGS(&factory));
@@ -671,43 +674,59 @@ void CreateMeshes()
 }
 #pragma endregion
 
+#pragma region FPSCounter
+void CountFPS()
+{
+	// FPS counter
+	static auto lastTime = std::chrono::high_resolution_clock::now();
+	static int frames = 0;
+	auto currentTime = std::chrono::high_resolution_clock::now();
+	frames++;
+
+	std::chrono::duration<double, std::milli> delta = currentTime - lastTime;
+	if (delta >= std::chrono::duration<double, std::milli>(250)) {
+		lastTime = std::chrono::high_resolution_clock::now();
+		int fps = frames * 4;
+		std::string windowText = "FPS " + std::to_string(fps);
+		SetWindowTextA(wndHandle, windowText.c_str());
+		frames = 0;
+	}
+}
+#pragma endregion
+
 #pragma region Update
 //todo run in CPU thread, no syncronization with render threads needed since it's using a separate GameState
 void Update()
 {
 	while (isRunning) {
+		int meshInd = 0;
+		static long long shift = 0;
+		for (auto &m : writeState.meshes) {
 
-		{
-			int meshInd = 0;
-			static long long shift = 0;
-			for (auto &m : writeState.meshes) {
-
-				//Update color values in constant buffer
-				for (int i = 0; i < 3; i++)
+			//Update color values in constant buffer
+			for (int i = 0; i < 3; i++)
+			{
+				//gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
+				m.color.values[i] += 0.0001f * (i + 1);
+				if (m.color.values[i] > 1)
 				{
-					//gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
-					m.color.values[i] += 0.0001f * (i + 1);
-					if (m.color.values[i] > 1)
-					{
-						m.color.values[i] = 0;
-					}
+					m.color.values[i] = 0;
 				}
-
-				//Update positions of each mesh
-				m.translate = ConstantBuffer{
-					xt[(int)(float)(meshInd * 10 + shift) % (TOTAL_PLACES)],
-					yt[(int)(float)(meshInd * 10 + shift) % (TOTAL_PLACES)],
-					meshInd * (-1.0f / TOTAL_PLACES),
-					0.0f
-				};
-
-				meshInd++;
 			}
-			shift += max((long long)(TOTAL_TRIS / 1000.0), (long long)(TOTAL_TRIS / 100.0));
+
+			//Update positions of each mesh
+			m.translate = ConstantBuffer{
+				xt[(int)(float)(meshInd * 10 + shift) % (TOTAL_PLACES)],
+				yt[(int)(float)(meshInd * 10 + shift) % (TOTAL_PLACES)],
+				meshInd * (-1.0f / TOTAL_PLACES),
+				0.0f
+			};
+
+			meshInd++;
 		}
+		shift += max((long long)(TOTAL_TRIS / 1000.0), (long long)(TOTAL_TRIS / 100.0));
 
-
-		// todo mutex lock or something
+		//copy updated gamestate to bufferstate
 		bufferTransferLock.lock();
 		bufferState = writeState;
 		bufferTransferLock.unlock();
@@ -716,10 +735,10 @@ void Update()
 #pragma endregion
 
 #pragma region Render
-//todo run on GPU thread, no synconization with CPU thread needed since using separate GameState buffer
 void Render()
 {
 	static size_t lastThreadIndex = 0;
+	CountFPS();
 
 	if (isRunning) {
 		thread_local int index;
@@ -727,7 +746,7 @@ void Render()
 		//get the thread index
 		threadIDIndexLock.lock();
 		index = lastThreadIndex;
-		lastThreadIndex = (lastThreadIndex++) % MAX_THREAD_COUNT;
+		lastThreadIndex = (++lastThreadIndex) % MAX_THREAD_COUNT;
 		threadIDIndexLock.unlock();
 
 		//get the current game state
@@ -740,12 +759,19 @@ void Render()
 
 		//Command list allocators can only be reset when the associated command lists have
 		//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
-		ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[QUEUE_TYPE_DIRECT].mAllocator;
+		ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
 #ifdef VETTIG_DATOR
 		ID3D12GraphicsCommandList4*	commandList = gAllocatorsAndLists[QUEUE_TYPE_DIRECT].mCommandList;
 #else
-		ID3D12GraphicsCommandList3*	directList = gAllocatorsAndLists[QUEUE_TYPE_DIRECT].mCommandList;
+		ID3D12GraphicsCommandList3*	directList = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
 #endif
+		if (gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].isActive) {
+			int a = 5;
+		}
+		else {
+			gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].isActive = true;
+		}
+
 
 		directAllocator->Reset();
 		directList->Reset(directAllocator, gPipeLineState);
@@ -787,6 +813,7 @@ void Render()
 
 
 		//Update constant buffers and draw triangles
+		//for (int i = 0; i < 100; ++i) {
 		for (auto &m : readOnlyState.meshes) {
 			const void* translateConstant = &m.translate;
 			directList->SetGraphicsRoot32BitConstants(0, 4, translateConstant, 0);
@@ -796,7 +823,7 @@ void Render()
 
 			directList->DrawInstanced(3, 1, 0, 0);
 		}
-
+		//}
 
 		//Indicate that the back buffer will now be used to present.
 		SetResourceTransitionBarrier(directList,
@@ -808,6 +835,12 @@ void Render()
 		//Close the list to prepare it for execution.
 		directList->Close();
 
+		//wait for current frame to finish rendering before pushing the next one to GPU
+		gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+
+		// set the just executed command allocator and list to inactive
+		gAllocatorsAndLists[(index + MAX_THREAD_COUNT - 1) % MAX_THREAD_COUNT][QUEUE_TYPE_DIRECT].isActive = false;
+
 		//Execute the command list.
 		ID3D12CommandList* listsToExecute[] = { directList };
 		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
@@ -816,7 +849,7 @@ void Render()
 		DXGI_PRESENT_PARAMETERS pp = {};
 		gSwapChain4->Present1(0, 0, &pp);
 
-		gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+		//gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 		//Wait for GPU to finish.
 		//NOT BEST PRACTICE, only used as such for simplicity.
 

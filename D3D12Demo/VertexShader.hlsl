@@ -7,7 +7,7 @@ struct VSIn
 struct VSOut
 {
 	float4 pos		: SV_POSITION;
-	//float4 color	: COLOR;
+	float4 color	: COLOR; //for stress testing
 };
 
 cbuffer Translation : register(b0)
@@ -18,6 +18,14 @@ cbuffer Translation : register(b0)
 VSOut VS_main( VSIn input, uint index : SV_VertexID )
 {
 	VSOut output = (VSOut)0;
+
+	// for stress testing
+	float4 test = { 0.5, 0.5, 0.5, 0.5 };
+	//for (int i = 0; i < 2000000; i++) {
+	//	test.x = sin(i);
+	//}
+	output.color = test;
+
 	output.pos = input.pos +translate;
 	output.pos.z += 0.55; // move them backwards so that they're in front of the camera
 	return output;

@@ -1,7 +1,7 @@
 struct VSOut
 {
 	float4 pos		: SV_POSITION;
-	//float4 color	: COLOR;
+	float4 color	: COLOR;
 };
 
 cbuffer Color : register(b1)

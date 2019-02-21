@@ -10,6 +10,10 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
+#include <chrono>
+#include <ctime>
+#include <string>
+
 #pragma comment (lib, "d3d12.lib")
 #pragma comment (lib, "DXGI.lib")
 #pragma comment (lib, "d3dcompiler.lib")
@@ -63,7 +67,7 @@ void CreateRootSignature();
 void CreateConstantBufferResources();
 void CreateMeshes();
 
-
+void	CountFPS();
 void	Update();
 void	Render();
 
@@ -76,7 +80,11 @@ struct CommandAllocatorAndList;
 
 #pragma region Globals
 #define MAX_THREAD_COUNT 5
-//todo one (or three?) command lists per thread
+HWND wndHandle;
+
+
+
+
 #ifdef VETTIG_DATOR
 ID3D12Device5*				gDevice5 = nullptr;
 #else
@@ -175,8 +183,7 @@ struct CommandAllocatorAndList
 
 CommandQueueAndFence gCommandQueues[3];
 
-//todo Make this a per-thread object
-CommandAllocatorAndList gAllocatorsAndLists[3];
+CommandAllocatorAndList gAllocatorsAndLists[MAX_THREAD_COUNT][3];
 
 
 //ID3D12CommandAllocator*		gCommandAllocator					= nullptr;
@@ -213,7 +220,7 @@ ID3D12Resource1*		gConstantBufferResource[NUM_SWAP_BUFFERS] = {};
 #pragma region GameState
 
 // TOTAL_TRIS pretty much decides how many drawcalls in a brute force approach.
-constexpr int TOTAL_TRIS = 400;
+constexpr int TOTAL_TRIS = 4000;
 // this has to do with how the triangles are spread in the screen, not important.
 constexpr int TOTAL_PLACES = 2 * TOTAL_TRIS * 20;
 float xt[TOTAL_PLACES], yt[TOTAL_PLACES];
