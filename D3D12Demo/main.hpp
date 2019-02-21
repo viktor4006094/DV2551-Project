@@ -44,6 +44,7 @@ inline void SafeRelease(
 const unsigned int SCREEN_WIDTH = 640; //Width of application.
 const unsigned int SCREEN_HEIGHT = 480;	//Height of application.
 
+#define MAX_THREAD_COUNT 5
 const unsigned int NUM_SWAP_BUFFERS = 2; //Number of buffers
 
 
@@ -55,8 +56,9 @@ LRESULT CALLBACK	WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 //Helper function for syncronization of GPU/CPU
 void WaitForGpu(QueueType type);
 //Helper function for resource transitions
-
-void CreateDirect3DDevice(HWND wndHandle);				//2. Create Device
+void SetResourceTransitionBarrier(ID3D12GraphicsCommandList* commandList, ID3D12Resource* resource,
+	D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter);
+void CreateDirect3DDevice(HWND wndHandle);					//2. Create Device
 void CreateCommandInterfacesAndSwapChain(HWND wndHandle);	//3. Create CommandQueue and SwapChain
 void CreateFenceAndEventHandle();							//4. Create Fence and Event handle
 void CreateRenderTargets();									//5. Create render targets for backbuffer
@@ -79,7 +81,6 @@ struct CommandAllocatorAndList;
 
 
 #pragma region Globals
-#define MAX_THREAD_COUNT 5
 HWND wndHandle;
 
 

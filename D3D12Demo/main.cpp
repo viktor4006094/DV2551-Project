@@ -56,8 +56,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
 		CreateMeshes();										//11. Create meshes (all use same triangle but different constant buffers)
 
-		//todo
-		//WaitForGpu();
+		WaitForGpu(QUEUE_TYPE_DIRECT);
 		
 		std::thread(Update).detach();
 		std::thread(Render).detach();
@@ -72,9 +71,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 			}
 			else
 			{
-				//moved to Render
-				//UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
-
 				//Update();
 				//Render();
 			}
@@ -181,24 +177,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 void WaitForGpu(QueueType type)
 {
 	gCommandQueues[type].WaitForGpu();
-
-	////WAITING FOR EACH FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
-	////This is code implemented as such for simplicity. The cpu could for example be used
-	////for other tasks to prepare the next frame while the current one is being rendered.
-
-	////Signal and increment the fence value.
-	//const UINT64 fence = gFenceValue;
-
-	//gCommandQueue->Signal(gFence, fence);
-	//
-	//gFenceValue++;
-	//
-	////Wait until command queue is done.
-	//if(gFence->GetCompletedValue() < fence)
-	//{
-	//	gFence->SetEventOnCompletion(fence, gEventHandle);
-	//	WaitForSingleObject(gEventHandle, INFINITE);
-	//}
 }
 #pragma endregion
 
@@ -695,7 +673,6 @@ void CountFPS()
 #pragma endregion
 
 #pragma region Update
-//todo run in CPU thread, no syncronization with render threads needed since it's using a separate GameState
 void Update()
 {
 	while (isRunning) {
@@ -776,18 +753,11 @@ void Render()
 		directAllocator->Reset();
 		directList->Reset(directAllocator, gPipeLineState);
 
-		//Set constant buffer descriptor heap
-		/*ID3D12DescriptorHeap* descriptorHeaps[] = { gDescriptorHeap[backBufferIndex] };
-		gCommandList4->SetDescriptorHeaps(ARRAYSIZE(descriptorHeaps), descriptorHeaps);*/
 
 		//Set root signature
 		directList->SetGraphicsRootSignature(gRootSignature);
 
-		//Set root descriptor table to index 0 in previously set root signature
-		//gCommandList4->SetGraphicsRootDescriptorTable(0,
-		//	gDescriptorHeap[backBufferIndex]->GetGPUDescriptorHandleForHeapStart());
-
-	//Set necessary states.
+		//Set necessary states.
 		directList->RSSetViewports(1, &gViewport);
 		directList->RSSetScissorRects(1, &gScissorRect);
 
