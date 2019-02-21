@@ -25,7 +25,7 @@ struct Vertex
 bool isRunning = true;
 std::mutex threadIDIndexLock;
 std::mutex bufferTransferLock;
-#define MAX_THREAD_COUNT 5
+
 
 
 

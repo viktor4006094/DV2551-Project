@@ -75,7 +75,7 @@ struct CommandAllocatorAndList;
 
 
 #pragma region Globals
-
+#define MAX_THREAD_COUNT 5
 //todo one (or three?) command lists per thread
 #ifdef VETTIG_DATOR
 ID3D12Device5*				gDevice5 = nullptr;
