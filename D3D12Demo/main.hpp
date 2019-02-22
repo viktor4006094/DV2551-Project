@@ -30,13 +30,10 @@ enum QueueType : size_t {
 
 
 template<class Interface>
-inline void SafeRelease(
-	Interface **ppInterfaceToRelease)
+inline void SafeRelease(Interface **ppInterfaceToRelease)
 {
-	if (*ppInterfaceToRelease != NULL)
-	{
+	if (*ppInterfaceToRelease != NULL) {
 		(*ppInterfaceToRelease)->Release();
-
 		(*ppInterfaceToRelease) = NULL;
 	}
 }
@@ -44,8 +41,8 @@ inline void SafeRelease(
 const unsigned int SCREEN_WIDTH = 640; //Width of application.
 const unsigned int SCREEN_HEIGHT = 480;	//Height of application.
 
-#define MAX_THREAD_COUNT 5
-const unsigned int NUM_SWAP_BUFFERS = 2; //Number of buffers
+const unsigned int MAX_PREPARED_FRAMES = 3; // number of frames that can be queued
+const unsigned int NUM_SWAP_BUFFERS = 3; //Number of buffers
 
 
 #pragma region Forward Declarations
@@ -69,9 +66,9 @@ void CreateRootSignature();
 void CreateConstantBufferResources();
 void CreateMeshes();
 
-void	CountFPS();
-void	Update();
-void	Render();
+void CountFPS();
+void Update();
+void Render();
 
 
 struct CommandQueueAndFence;
@@ -145,7 +142,10 @@ struct CommandAllocatorAndList
 #else
 	ID3D12GraphicsCommandList3*	mCommandList = nullptr;
 #endif
-	bool isActive = false; //todo one per step
+	UINT64 mLastFrameWithThisAllocatorFenceValue = 0;
+	HANDLE				mEventHandle = nullptr;
+
+
 
 
 	void CreateCommandListAndAllocator(QueueType type)
@@ -169,10 +169,14 @@ struct CommandAllocatorAndList
 		//Command lists are created in the recording state. Since there is nothing to
 		//record right now and the main loop expects it to be closed, we close it.
 		mCommandList->Close();
+
+		mEventHandle = CreateEvent(0, false, false, 0);
+
 	}
 
 	void Release()
 	{
+		CloseHandle(mEventHandle);
 		SafeRelease(&mAllocator);
 		SafeRelease(&mCommandList);
 	}
@@ -183,8 +187,7 @@ struct CommandAllocatorAndList
 
 
 CommandQueueAndFence gCommandQueues[3];
-
-CommandAllocatorAndList gAllocatorsAndLists[MAX_THREAD_COUNT][3];
+CommandAllocatorAndList gAllocatorsAndLists[MAX_PREPARED_FRAMES][3];
 
 
 //ID3D12CommandAllocator*		gCommandAllocator					= nullptr;
@@ -245,6 +248,8 @@ struct GameState
 */
 GameState writeState;
 GameState bufferState;
-GameState readOnlyState;
+GameState readOnlyState[MAX_PREPARED_FRAMES]; // might not be needed for correctness
+
+
 
 #pragma endregion
