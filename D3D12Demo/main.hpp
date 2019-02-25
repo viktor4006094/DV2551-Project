@@ -60,7 +60,12 @@ void CreateCommandInterfacesAndSwapChain(HWND wndHandle);	//3. Create CommandQue
 void CreateFenceAndEventHandle();							//4. Create Fence and Event handle
 void CreateRenderTargets();									//5. Create render targets for backbuffer
 void CreateViewportAndScissorRect();						//6. Create viewport and rect
-void CreateShadersAndPiplelineState();						//7. Set up the pipeline state
+
+void CreateShadersAndPipelineStates();						//7. Set up the pipeline states
+void CreateRenderShadersAndPiplelineState();
+void CreateComputeShadersAndPiplelineState();
+void CreatePassthroughShadersAndPiplelineState();
+
 void CreateTriangleData();									//8. Create vertexdata
 void CreateRootSignature();
 void CreateConstantBufferResources();
@@ -202,7 +207,12 @@ D3D12_VIEWPORT				gViewport = {};
 D3D12_RECT					gScissorRect = {};
 
 ID3D12RootSignature*		gRootSignature = nullptr;
-ID3D12PipelineState*		gPipeLineState = nullptr;
+ID3D12PipelineState*		gRenderPipeLineState = nullptr;
+ID3D12PipelineState*		gComputePipeLineState = nullptr;
+
+// only for testing
+ID3D12PipelineState*		gPassthroughPipeLineState = nullptr;
+
 
 ID3D12Resource1*			gVertexBufferResource = nullptr;
 D3D12_VERTEX_BUFFER_VIEW	gVertexBufferView = {};

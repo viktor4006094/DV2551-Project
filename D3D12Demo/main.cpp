@@ -50,7 +50,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
 		CreateRootSignature();								//7. Create root signature
 
-		CreateShadersAndPiplelineState();					//8. Set up the pipeline state
+		CreateShadersAndPipelineStates();					//8. Set up the pipeline state
 
 		CreateConstantBufferResources();					//9. Create constant buffer data
 	
@@ -128,7 +128,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 	}
 
 	SafeRelease(&gRootSignature);
-	SafeRelease(&gPipeLineState);
+	SafeRelease(&gRenderPipeLineState);
 
 	SafeRelease(&gVertexBufferResource);
 
@@ -447,13 +447,14 @@ void CreateRootSignature()
 	dtRanges[0].RegisterSpace = 0; //register(b0,space0);
 	dtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
+	
 	//create a descriptor table
 	D3D12_ROOT_DESCRIPTOR_TABLE dt;
 	dt.NumDescriptorRanges = ARRAYSIZE(dtRanges);
 	dt.pDescriptorRanges = dtRanges;
 
 	//create root parameter
-	D3D12_ROOT_PARAMETER rootParam[2];
+	D3D12_ROOT_PARAMETER rootParam[3];
 
 	// constant translate 
 	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
@@ -464,6 +465,12 @@ void CreateRootSignature()
 	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
 	rootParam[1].Constants = { 1, 0, 4 }; // 4 constants in b0 first register space
 	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+	// Texture
+	rootParam[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam[2].DescriptorTable = dt;
+	rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
 
 	D3D12_ROOT_SIGNATURE_DESC rsDesc;
 	rsDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
@@ -488,7 +495,15 @@ void CreateRootSignature()
 #pragma endregion
 
 #pragma region CreateShadersAndPipelineState
-void CreateShadersAndPiplelineState()
+
+void CreateShadersAndPipelineStates() 
+{
+	CreateRenderShadersAndPiplelineState();
+	CreateComputeShadersAndPiplelineState();
+	CreatePassthroughShadersAndPiplelineState();
+}
+
+void CreateRenderShadersAndPiplelineState()
 {
 	////// Shader Compiles //////
 	ID3DBlob* vertexBlob;
@@ -566,7 +581,142 @@ void CreateShadersAndPiplelineState()
 	for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; i++)
 		gpsd.BlendState.RenderTarget[i] = defaultRTdesc;
 
-	gDevice5->CreateGraphicsPipelineState(&gpsd, IID_PPV_ARGS(&gPipeLineState));
+	gDevice5->CreateGraphicsPipelineState(&gpsd, IID_PPV_ARGS(&gRenderPipeLineState));
+}
+
+void CreateComputeShadersAndPiplelineState()
+{
+	////// Shader Compiles //////
+	ID3DBlob* computeBlob;
+	D3DCompileFromFile(
+		L"CS_TestShader.hlsl", // filename
+		nullptr,		// optional macros
+		nullptr,		// optional include files
+		"CS_main",		// entry point
+		"cs_5_0",		// shader model (target)
+		0,				// shader compile options			// here DEBUGGING OPTIONS
+		0,				// effect compile options
+		&computeBlob,	// double pointer to ID3DBlob		
+		nullptr			// pointer for Error Blob messages.
+						// how to use the Error blob, see here
+						// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
+	);
+
+
+
+	////// Pipline State //////
+	D3D12_COMPUTE_PIPELINE_STATE_DESC cpsd = {};
+
+	//Specify pipeline stages:
+	cpsd.pRootSignature = gRootSignature;
+	cpsd.CS.pShaderBytecode = reinterpret_cast<void*>(computeBlob->GetBufferPointer());
+	cpsd.CS.BytecodeLength = computeBlob->GetBufferSize();
+
+	////Specify render target and depthstencil usage.
+	//gpsd.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	//gpsd.NumRenderTargets = 1;
+
+	//gpsd.SampleDesc.Count = 1;
+	//gpsd.SampleMask = UINT_MAX;
+
+	////Specify rasterizer behaviour.
+	//gpsd.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+	//gpsd.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+
+	//Specify blend descriptions.
+	/*D3D12_RENDER_TARGET_BLEND_DESC defaultRTdesc = {
+		false, false,
+		D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+		D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+		D3D12_LOGIC_OP_NOOP, D3D12_COLOR_WRITE_ENABLE_ALL };
+	for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; i++)
+		cpsd.BlendState.RenderTarget[i] = defaultRTdesc;
+*/
+	gDevice5->CreateComputePipelineState(&cpsd, IID_PPV_ARGS(&gComputePipeLineState));
+}
+
+void CreatePassthroughShadersAndPiplelineState()
+{
+	////// Shader Compiles //////
+	ID3DBlob* vertexBlob;
+	D3DCompileFromFile(
+		L"VS_FullScreenTriangle.hlsl", // filename
+		nullptr,		// optional macros
+		nullptr,		// optional include files
+		"VS_main",		// entry point
+		"vs_5_0",		// shader model (target)
+		0,				// shader compile options			// here DEBUGGING OPTIONS
+		0,				// effect compile options
+		&vertexBlob,	// double pointer to ID3DBlob		
+		nullptr			// pointer for Error Blob messages.
+						// how to use the Error blob, see here
+						// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
+	);
+
+	ID3DBlob* pixelBlob;
+	D3DCompileFromFile(
+		L"PS_Passthrough.hlsl", // filename
+		nullptr,		// optional macros
+		nullptr,		// optional include files
+		"PS_main",		// entry point
+		"ps_5_0",		// shader model (target)
+		0,				// shader compile options			// here DEBUGGING OPTIONS
+		0,				// effect compile options
+		&pixelBlob,		// double pointer to ID3DBlob		
+		nullptr			// pointer for Error Blob messages.
+						// how to use the Error blob, see here
+						// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
+	);
+
+	////// Input Layout //////
+	//D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {
+	//	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	//	{ "COLOR"	, 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+	//};	
+	
+
+	// Empty input layout
+	D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+	};
+
+	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc;
+	inputLayoutDesc.pInputElementDescs = inputElementDesc;
+	inputLayoutDesc.NumElements = ARRAYSIZE(inputElementDesc);
+
+	////// Pipline State //////
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC gpsd = {};
+
+	//Specify pipeline stages:
+	gpsd.pRootSignature = gRootSignature;
+	gpsd.InputLayout = inputLayoutDesc;
+	gpsd.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	gpsd.VS.pShaderBytecode = reinterpret_cast<void*>(vertexBlob->GetBufferPointer());
+	gpsd.VS.BytecodeLength = vertexBlob->GetBufferSize();
+	gpsd.PS.pShaderBytecode = reinterpret_cast<void*>(pixelBlob->GetBufferPointer());
+	gpsd.PS.BytecodeLength = pixelBlob->GetBufferSize();
+
+	//Specify render target and depthstencil usage.
+	gpsd.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+	gpsd.NumRenderTargets = 1;
+
+	gpsd.SampleDesc.Count = 1;
+	gpsd.SampleMask = UINT_MAX;
+
+	//Specify rasterizer behaviour.
+	gpsd.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+	gpsd.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+
+	//Specify blend descriptions.
+	D3D12_RENDER_TARGET_BLEND_DESC defaultRTdesc = {
+		false, false,
+		D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+		D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+		D3D12_LOGIC_OP_NOOP, D3D12_COLOR_WRITE_ENABLE_ALL };
+	for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; i++)
+		gpsd.BlendState.RenderTarget[i] = defaultRTdesc;
+
+	gDevice5->CreateGraphicsPipelineState(&gpsd, IID_PPV_ARGS(&gPassthroughPipeLineState));
 }
 #pragma endregion
 
@@ -766,7 +916,7 @@ void Render(int id)
 		//}
 
 		directAllocator->Reset();
-		directList->Reset(directAllocator, gPipeLineState);
+		directList->Reset(directAllocator, gRenderPipeLineState);
 
 
 		//Set root signature
@@ -818,10 +968,9 @@ void Render(int id)
 			D3D12_RESOURCE_STATE_PRESENT		//state after
 		);
 
+
 		//Close the list to prepare it for execution.
 		directList->Close();
-
-
 
 		//wait for current frame to finish rendering before pushing the next one to GPU
 		gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
@@ -832,6 +981,126 @@ void Render(int id)
 		//Execute the command list.
 		ID3D12CommandList* listsToExecute[] = { directList };
 		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
+
+
+		//// Compute shader part ////
+
+		gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+
+		directAllocator->Reset();
+		directList->Reset(directAllocator, gPassthroughPipeLineState);
+
+		//Set root signature
+		directList->SetGraphicsRootSignature(gRootSignature);
+
+
+		//Indicate that the back buffer will be used as render target.
+		SetResourceTransitionBarrier(directList,
+			gRenderTargets[backBufferIndex],
+			D3D12_RESOURCE_STATE_PRESENT,		//state before
+			D3D12_RESOURCE_STATE_RENDER_TARGET	//state after
+		);
+
+
+
+		//Record commands.
+		//Get the handle for the current render target used as back buffer.
+		D3D12_CPU_DESCRIPTOR_HANDLE cdh = gRenderTargetsHeap->GetCPUDescriptorHandleForHeapStart();
+		cdh.ptr += gRenderTargetDescriptorSize * backBufferIndex;
+
+		directList->OMSetRenderTargets(1, &cdh, true, nullptr);
+
+		
+
+		//Indicate that the back buffer will now be used to present.
+		SetResourceTransitionBarrier(directList,
+			gRenderTargets[backBufferIndex],
+			D3D12_RESOURCE_STATE_RENDER_TARGET,	//state before
+			D3D12_RESOURCE_STATE_PRESENT		//state after
+		);
+
+
+		//Close the list to prepare it for execution.
+		directList->Close();
+
+		//wait for current frame to finish rendering before pushing the next one to GPU
+		gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+
+		// set the just executed command allocator and list to inactive
+		//gAllocatorsAndLists[(index + MAX_THREAD_COUNT - 1) % MAX_THREAD_COUNT][QUEUE_TYPE_DIRECT].isActive = false;
+
+		//Execute the command list.
+		ID3D12CommandList* listsToExecute2[] = { directList };
+		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
+
+
+
+		//// Passthrough ////
+
+		gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+
+		directAllocator->Reset();
+		directList->Reset(directAllocator, gPassthroughPipeLineState);
+
+		//Set root signature
+		directList->SetGraphicsRootSignature(gRootSignature);
+
+		//Set necessary states.
+		directList->RSSetViewports(1, &gViewport);
+		directList->RSSetScissorRects(1, &gScissorRect);
+
+		//Indicate that the back buffer will be used as render target.
+		SetResourceTransitionBarrier(directList,
+			gRenderTargets[backBufferIndex],
+			D3D12_RESOURCE_STATE_PRESENT,		//state before
+			D3D12_RESOURCE_STATE_RENDER_TARGET	//state after
+		);
+
+		//Record commands.
+		//Get the handle for the current render target used as back buffer.
+		cdh = gRenderTargetsHeap->GetCPUDescriptorHandleForHeapStart();
+		cdh.ptr += gRenderTargetDescriptorSize * backBufferIndex;
+
+		directList->OMSetRenderTargets(1, &cdh, true, nullptr);
+
+		directList->ClearRenderTargetView(cdh, clearColor, 0, nullptr);
+
+		directList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		directList->IASetVertexBuffers(0, 1, &gVertexBufferView);
+
+		//get the current game state
+		bufferTransferLock.lock();
+		readOnlyState[index] = bufferState;
+		bufferTransferLock.unlock();
+
+		directList->DrawInstanced(3, 1, 0, 0);
+
+		//Indicate that the back buffer will now be used to present.
+		SetResourceTransitionBarrier(directList,
+			gRenderTargets[backBufferIndex],
+			D3D12_RESOURCE_STATE_RENDER_TARGET,	//state before
+			D3D12_RESOURCE_STATE_PRESENT		//state after
+		);
+
+		//Close the list to prepare it for execution.
+		directList->Close();
+
+		//wait for current frame to finish rendering before pushing the next one to GPU
+		gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+
+		// set the just executed command allocator and list to inactive
+		//gAllocatorsAndLists[(index + MAX_THREAD_COUNT - 1) % MAX_THREAD_COUNT][QUEUE_TYPE_DIRECT].isActive = false;
+
+		//Execute the command list.
+		ID3D12CommandList* listsToExecute2[] = { directList };
+		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
+
+
+		////! Passthrough
+
+
+
+
 
 		//Present the frame.
 		DXGI_PRESENT_PARAMETERS pp = {};
@@ -854,9 +1123,13 @@ void Render(int id)
 		//Wait for GPU to finish.
 		//NOT BEST PRACTICE, only used as such for simplicity.
 
+
+		//todo wait for previous render call with this render target index to finish the JPEG part
+		
 		// create new render thread
 		pool.push(Render);
 		//std::thread(Render).detach();
+
 	}
 }
 #pragma endregion

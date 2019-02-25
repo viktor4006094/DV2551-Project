@@ -22,6 +22,9 @@
   <ItemGroup>
     <FxCompile Include="PixelShader.hlsl" />
     <FxCompile Include="VertexShader.hlsl" />
+    <FxCompile Include="VS_FullScreenTriangle.hlsl" />
+    <FxCompile Include="CS_TestShader.hlsl" />
+    <FxCompile Include="PS_Passthrough.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.hpp">
