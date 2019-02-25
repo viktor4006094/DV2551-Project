@@ -27,11 +27,13 @@ std::mutex threadIDIndexLock;
 std::mutex bufferTransferLock;
 
 
-
+// Thread pool
+ctpl::thread_pool pool(10); //1 CPU update, 9 render
 
 #pragma region wwinMain
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
+
 	MSG msg			= {0};
 	wndHandle	= InitWindow(hInstance);			//1. Create Window
 	if(wndHandle)
@@ -58,8 +60,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
 		WaitForGpu(QUEUE_TYPE_DIRECT);
 		
-		std::thread(Update).detach();
-		std::thread(Render).detach();
+		pool.push(Update);
+		pool.push(Render);
+
+		//std::thread(Update).detach();
+		//std::thread(Render).detach();
+		
 		ShowWindow(wndHandle, nCmdShow);
 		while(WM_QUIT != msg.message)
 		{
@@ -79,7 +85,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 	}
 	
 	//Wait for GPU execution to be done and then release all interfaces.
+	
+	// sleep main thread for half a second so that worker threads have time to finish executing
 	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	
 	WaitForGpu(QUEUE_TYPE_DIRECT); //todo DON'T
 	
 	//CloseHandle(gEventHandle);
@@ -673,7 +682,7 @@ void CountFPS()
 #pragma endregion
 
 #pragma region Update
-void Update()
+void Update(int id)
 {
 	static auto startTime = std::chrono::high_resolution_clock::now();
 	while (isRunning) {
@@ -720,18 +729,18 @@ void Update()
 #pragma endregion
 
 #pragma region Render
-void Render()
+void Render(int id)
 {
-	static size_t lastThreadIndex = 0;
-	CountFPS();
+	static size_t lastRenderIterationIndex = 0;
 
 	if (isRunning) {
 		thread_local int index;
+		CountFPS();
 
 		//get the thread index
 		threadIDIndexLock.lock();
-		index = lastThreadIndex;
-		lastThreadIndex = (++lastThreadIndex) % MAX_PREPARED_FRAMES;
+		index = lastRenderIterationIndex;
+		lastRenderIterationIndex = (++lastRenderIterationIndex) % MAX_PREPARED_FRAMES;
 		threadIDIndexLock.unlock();
 
 		UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
@@ -846,7 +855,8 @@ void Render()
 		//NOT BEST PRACTICE, only used as such for simplicity.
 
 		// create new render thread
-		std::thread(Render).detach();
+		pool.push(Render);
+		//std::thread(Render).detach();
 	}
 }
 #pragma endregion

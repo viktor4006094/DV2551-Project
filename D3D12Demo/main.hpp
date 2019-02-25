@@ -67,8 +67,8 @@ void CreateConstantBufferResources();
 void CreateMeshes();
 
 void CountFPS();
-void Update();
-void Render();
+void Update(int id);
+void Render(int id);
 
 
 struct CommandQueueAndFence;
