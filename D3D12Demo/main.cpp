@@ -12,7 +12,7 @@
 #include <vector>
 
 
-
+#include "..\extLib\ctpl_stl.h"
 
 struct Vertex
 {
@@ -747,9 +747,9 @@ void Render()
 		HANDLE eventHandle = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mEventHandle;
 
 
-		//! since WaitForGPU is called just before the commandlist is executed in the previous frame this does 
-		//! not need to be done here since the command allocator is already guaranteed to have finished executing
-		// wait for previous usage of this command allocator to be done executing before it is reset
+		////! since WaitForGPU is called just before the commandlist is executed in the previous frame this does 
+		////! not need to be done here since the command allocator is already guaranteed to have finished executing
+		//// wait for previous usage of this command allocator to be done executing before it is reset
 		//UINT64 prevFence = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mLastFrameWithThisAllocatorFenceValue;
 		//if (fence->GetCompletedValue() < prevFence) {
 		//	fence->SetEventOnCompletion(prevFence, eventHandle);
