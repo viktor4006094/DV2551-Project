@@ -411,7 +411,7 @@ void CreateComputeShaderResources()
 
 
 	D3D12_DESCRIPTOR_HEAP_DESC dhd = {};
-	dhd.NumDescriptors = 2;
+	dhd.NumDescriptors = NUM_SWAP_BUFFERS + 1;
 	dhd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	dhd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
@@ -420,9 +420,25 @@ void CreateComputeShaderResources()
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 
-	gDevice5->CreateUnorderedAccessView(
-		gUAVResource, nullptr, &uavDesc, 
-		gComputeDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	D3D12_CPU_DESCRIPTOR_HANDLE cdh = gComputeDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+
+	gDevice5->CreateUnorderedAccessView(gUAVResource, nullptr, &uavDesc, cdh);
+
+	cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+
+	// Create SRVs for all the buffers in the swap chain so that they can be read from by the compute shader
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MipLevels = 1;
+
+	for (int i = 0; i < NUM_SWAP_BUFFERS; i++) {
+		gDevice5->CreateShaderResourceView(gRenderTargets[i], &srvDesc, cdh);
+		cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	}
+
 }
 #pragma endregion
 
@@ -1129,9 +1145,12 @@ void ComputePass(int index)
 	ID3D12DescriptorHeap* dheap1[] = { gComputeDescriptorHeap };
 	directList->SetDescriptorHeaps(_countof(dheap1), dheap1);
 
+	D3D12_GPU_DESCRIPTOR_HANDLE gdh = gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	directList->SetComputeRootDescriptorTable(3, gdh);
 
-	//directList->SetComputeRootDescriptorTable(2, );
-	directList->SetComputeRootDescriptorTable(3, gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	gdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	gdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*backBufferIndex;
+	directList->SetComputeRootDescriptorTable(2, gdh);
 
 	directList->Dispatch(16, 24, 1);
 
