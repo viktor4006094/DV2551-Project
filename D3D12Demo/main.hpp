@@ -68,13 +68,15 @@ void CreatePassthroughShadersAndPiplelineState();
 
 void CreateTriangleData();									//8. Create vertexdata
 void CreateRootSignature();
-void CreateUAVResources();
+void CreateComputeShaderResources();
 void CreateConstantBufferResources();
 void CreateMeshes();
 
 void CountFPS();
 void Update(int id);
 void Render(int id);
+void ComputePass(int index);
+void PassthroughPass(int index);
 
 
 struct CommandQueueAndFence;

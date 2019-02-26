@@ -58,7 +58,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
 		CreateMeshes();										//11. Create meshes (all use same triangle but different constant buffers)
 
-		CreateUAVResources();
+		CreateComputeShaderResources();
 
 		WaitForGpu(QUEUE_TYPE_DIRECT);
 		
@@ -288,7 +288,7 @@ void CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 
 	cqd.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
 	gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue));
-	
+
 
 	//Create command allocator. The command allocator object corresponds
 	//to the underlying allocations in which GPU commands are stored.
@@ -310,7 +310,7 @@ void CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 	scDesc.Stereo = FALSE;
 	scDesc.SampleDesc.Count = 1;
 	scDesc.SampleDesc.Quality = 0;
-	scDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	scDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT;
 	scDesc.BufferCount = NUM_SWAP_BUFFERS;
 	scDesc.Scaling = DXGI_SCALING_NONE;
 	scDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -354,23 +354,12 @@ void CreateRenderTargets()
 	dhd.Type						= D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 
 	HRESULT hr = gDevice5->CreateDescriptorHeap(&dhd, IID_PPV_ARGS(&gRenderTargetsHeap));
-	
-
-	// Create descriptor heap for SRV and UAV in compute shader
-	D3D12_DESCRIPTOR_HEAP_DESC cdhd = {};
-	cdhd.NumDescriptors = 2;
-	cdhd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	cdhd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-
-	hr = gDevice5->CreateDescriptorHeap(&cdhd, IID_PPV_ARGS(&gComputeDescriptorHeap));
-
-	
-
 
 	//Create resources for the render targets.
 	gRenderTargetDescriptorSize = gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	D3D12_CPU_DESCRIPTOR_HANDLE cdh = gRenderTargetsHeap->GetCPUDescriptorHandleForHeapStart();
 	
+
 	//One RTV for each frame.
 	for(UINT n = 0; n < NUM_SWAP_BUFFERS; n++)
 	{
@@ -399,7 +388,7 @@ void CreateViewportAndScissorRect()
 #pragma endregion
 
 #pragma region CreateUAVResources
-void CreateUAVResources()
+void CreateComputeShaderResources()
 {
 	D3D12_RESOURCE_DESC resDesc = {};
 	resDesc.DepthOrArraySize = 1;
@@ -422,7 +411,7 @@ void CreateUAVResources()
 
 
 	D3D12_DESCRIPTOR_HEAP_DESC dhd = {};
-	dhd.NumDescriptors = 1;
+	dhd.NumDescriptors = 2;
 	dhd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	dhd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
@@ -1063,129 +1052,16 @@ void Render(int id)
 		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
 
 
-		//// Compute shader part ////
 
-		gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 
-		directAllocator->Reset();
-		directList->Reset(directAllocator, gComputePipeLineState);
-
-		//Set root signature
-		directList->SetComputeRootSignature(gRootSignature);
-
-		SetResourceTransitionBarrier(directList,
-			gRenderTargets[backBufferIndex],
-			D3D12_RESOURCE_STATE_RENDER_TARGET,		//state before
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE		//state after
-		);
+		// Execute Compute shader
+		ComputePass(index);
 
 		
-		ID3D12DescriptorHeap* dheap1[] = { gComputeDescriptorHeap };
-		directList->SetDescriptorHeaps(_countof(dheap1), dheap1);
-
-		//directList->SetComputeRootDescriptorTable(2, gComputeDescriptorHeap->);
-		directList->SetComputeRootDescriptorTable(3, gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-
-		directList->Dispatch(16, 24, 1);
-
-		SetResourceTransitionBarrier(directList,
-			gUAVResource,
-			D3D12_RESOURCE_STATE_UNORDERED_ACCESS,		//state before
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE		//state after
-		);
 
 
-		//Indicate that the back buffer will be used as render target.
-		SetResourceTransitionBarrier(directList,
-			gRenderTargets[backBufferIndex],
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,		//state before
-			D3D12_RESOURCE_STATE_RENDER_TARGET		//state after
-		);
-
-		
-		//Close the list to prepare it for execution.
-		directList->Close();
-
-		//wait for current frame to finish rendering before pushing the next one to GPU
-		gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
-
-		// set the just executed command allocator and list to inactive
-		//gAllocatorsAndLists[(index + MAX_THREAD_COUNT - 1) % MAX_THREAD_COUNT][QUEUE_TYPE_DIRECT].isActive = false;
-
-		//Execute the command list.
-		ID3D12CommandList* listsToExecute2[] = { directList };
-		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
-
-
-
-		//// Passthrough ////
-
-		gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
-
-		directAllocator->Reset();
-		directList->Reset(directAllocator, gPassthroughPipeLineState);
-
-		//Set root signature
-		directList->SetGraphicsRootSignature(gRootSignature);
-
-		//Set necessary states.
-		directList->RSSetViewports(1, &gViewport);
-		directList->RSSetScissorRects(1, &gScissorRect);
-
-		////Indicate that the back buffer will be used as render target.
-		//SetResourceTransitionBarrier(directList,
-		//	gRenderTargets[backBufferIndex],
-		//	D3D12_RESOURCE_STATE_PRESENT,		//state before
-		//	D3D12_RESOURCE_STATE_RENDER_TARGET	//state after
-		//);
-
-		//Record commands.
-		//Get the handle for the current render target used as back buffer.
-		cdh = gRenderTargetsHeap->GetCPUDescriptorHandleForHeapStart();
-		cdh.ptr += gRenderTargetDescriptorSize * backBufferIndex;
-
-		directList->OMSetRenderTargets(1, &cdh, true, nullptr);
-
-		directList->ClearRenderTargetView(cdh, clearColor, 0, nullptr);
-
-		directList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-		ID3D12DescriptorHeap* dheap[] = { gComputeDescriptorHeap };
-		directList->SetDescriptorHeaps(_countof(dheap), dheap);
-		directList->SetGraphicsRootDescriptorTable(2, gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-
-		directList->DrawInstanced(3, 1, 0, 0);
-
-
-		//Indicate that the back buffer will now be used to present.
-		SetResourceTransitionBarrier(directList,
-			gRenderTargets[backBufferIndex],
-			D3D12_RESOURCE_STATE_RENDER_TARGET,	//state before
-			D3D12_RESOURCE_STATE_PRESENT		//state after
-		);
-
-		SetResourceTransitionBarrier(directList,
-			gUAVResource,
-			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,		//state before
-			D3D12_RESOURCE_STATE_UNORDERED_ACCESS		//state after
-		);
-
-		//Close the list to prepare it for execution.
-		directList->Close();
-
-		//wait for current frame to finish rendering before pushing the next one to GPU
-		gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
-
-		// set the just executed command allocator and list to inactive
-		//gAllocatorsAndLists[(index + MAX_THREAD_COUNT - 1) % MAX_THREAD_COUNT][QUEUE_TYPE_DIRECT].isActive = false;
-
-		//Execute the command list.
-		ID3D12CommandList* listsToExecute3[] = { directList };
-		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute3), listsToExecute3);
-
-
-		////! Passthrough
-
+		// Passthrough
+		PassthroughPass(index);
 
 
 
@@ -1202,11 +1078,9 @@ void Render(int id)
 		//	const UINT64 fenceVal = gCommandQueues[QUEUE_TYPE_DIRECT].mFenceValue;
 		//	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(fence, fenceVal);
 		//	gCommandQueues[QUEUE_TYPE_DIRECT].mFenceValue++;
-
 		//	gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mLastFrameWithThisAllocatorFenceValue = fenceVal;
 		//}
 		//threadIDIndexLock.unlock();
-
 		//gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 		//Wait for GPU to finish.
 		//NOT BEST PRACTICE, only used as such for simplicity.
@@ -1219,5 +1093,156 @@ void Render(int id)
 		//std::thread(Render).detach();
 
 	}
+}
+#pragma endregion
+
+#pragma region ComputePass
+void ComputePass(int index)
+{
+	UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
+	//Command list allocators can only be reset when the associated command lists have
+	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
+	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
+#ifdef VETTIG_DATOR
+	ID3D12GraphicsCommandList4*	commandList = gAllocatorsAndLists[QUEUE_TYPE_DIRECT].mCommandList;
+#else
+	ID3D12GraphicsCommandList3*	directList = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
+#endif
+
+	//// Compute shader part ////
+
+	gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+
+	directAllocator->Reset();
+	directList->Reset(directAllocator, gComputePipeLineState);
+
+	//Set root signature
+	directList->SetComputeRootSignature(gRootSignature);
+
+	SetResourceTransitionBarrier(directList,
+		gRenderTargets[backBufferIndex],
+		D3D12_RESOURCE_STATE_RENDER_TARGET,				//state before
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE		//state after
+	);
+
+
+	ID3D12DescriptorHeap* dheap1[] = { gComputeDescriptorHeap };
+	directList->SetDescriptorHeaps(_countof(dheap1), dheap1);
+
+
+	//directList->SetComputeRootDescriptorTable(2, );
+	directList->SetComputeRootDescriptorTable(3, gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+
+	directList->Dispatch(16, 24, 1);
+
+	SetResourceTransitionBarrier(directList,
+		gUAVResource,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,		//state before
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE		//state after
+	);
+
+
+	//Indicate that the back buffer will be used as render target.
+	SetResourceTransitionBarrier(directList,
+		gRenderTargets[backBufferIndex],
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,		//state before
+		D3D12_RESOURCE_STATE_RENDER_TARGET		//state after
+	);
+
+
+	//Close the list to prepare it for execution.
+	directList->Close();
+
+	//wait for current frame to finish rendering before pushing the next one to GPU
+	gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+
+	// set the just executed command allocator and list to inactive
+	//gAllocatorsAndLists[(index + MAX_THREAD_COUNT - 1) % MAX_THREAD_COUNT][QUEUE_TYPE_DIRECT].isActive = false;
+
+	//Execute the command list.
+	ID3D12CommandList* listsToExecute2[] = { directList };
+	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
+
+}
+#pragma endregion
+
+#pragma region Passthrough
+void PassthroughPass(int index)
+{
+	UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
+	//Command list allocators can only be reset when the associated command lists have
+	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
+	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
+#ifdef VETTIG_DATOR
+	ID3D12GraphicsCommandList4*	commandList = gAllocatorsAndLists[QUEUE_TYPE_DIRECT].mCommandList;
+#else
+	ID3D12GraphicsCommandList3*	directList = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
+#endif
+
+	//// Passthrough ////
+
+	gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+
+	directAllocator->Reset();
+	directList->Reset(directAllocator, gPassthroughPipeLineState);
+
+	//Set root signature
+	directList->SetGraphicsRootSignature(gRootSignature);
+
+	//Set necessary states.
+	directList->RSSetViewports(1, &gViewport);
+	directList->RSSetScissorRects(1, &gScissorRect);
+
+	////Indicate that the back buffer will be used as render target.
+	//SetResourceTransitionBarrier(directList,
+	//	gRenderTargets[backBufferIndex],
+	//	D3D12_RESOURCE_STATE_PRESENT,		//state before
+	//	D3D12_RESOURCE_STATE_RENDER_TARGET	//state after
+	//);
+
+	//Record commands.
+	//Get the handle for the current render target used as back buffer.
+	D3D12_CPU_DESCRIPTOR_HANDLE cdh = gRenderTargetsHeap->GetCPUDescriptorHandleForHeapStart();
+	cdh.ptr += gRenderTargetDescriptorSize * backBufferIndex;
+
+	directList->OMSetRenderTargets(1, &cdh, true, nullptr);
+
+	float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
+	directList->ClearRenderTargetView(cdh, clearColor, 0, nullptr);
+
+	directList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	ID3D12DescriptorHeap* dheap[] = { gComputeDescriptorHeap };
+	directList->SetDescriptorHeaps(_countof(dheap), dheap);
+	directList->SetGraphicsRootDescriptorTable(2, gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+
+	directList->DrawInstanced(3, 1, 0, 0);
+
+
+	//Indicate that the back buffer will now be used to present.
+	SetResourceTransitionBarrier(directList,
+		gRenderTargets[backBufferIndex],
+		D3D12_RESOURCE_STATE_RENDER_TARGET,	//state before
+		D3D12_RESOURCE_STATE_PRESENT		//state after
+	);
+
+	SetResourceTransitionBarrier(directList,
+		gUAVResource,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,		//state before
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS		//state after
+	);
+
+	//Close the list to prepare it for execution.
+	directList->Close();
+
+	//wait for current frame to finish rendering before pushing the next one to GPU
+	gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+
+	// set the just executed command allocator and list to inactive
+	//gAllocatorsAndLists[(index + MAX_THREAD_COUNT - 1) % MAX_THREAD_COUNT][QUEUE_TYPE_DIRECT].isActive = false;
+
+	//Execute the command list.
+	ID3D12CommandList* listsToExecute3[] = { directList };
+	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute3), listsToExecute3);
 }
 #pragma endregion

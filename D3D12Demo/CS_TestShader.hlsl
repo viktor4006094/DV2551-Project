@@ -40,8 +40,8 @@ void CS_main(
 	//Thread ID
 	float4 result = float4((screen_pos.x / 640.0f), (screen_pos.y / 480.0f), 0.0f, 1.0f);
 
-	//outputTex[screen_pos] = result;
-	outputTex[screen_pos] = float4(testCenter,1.0);
+	outputTex[screen_pos] = result;
+	//outputTex[screen_pos] = float4(testCenter,1.0);
 	//outputTex[screen_pos] = float4(1.0,0.0,0.0,1.0);
 
 }
