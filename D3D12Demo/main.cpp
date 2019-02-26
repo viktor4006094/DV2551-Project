@@ -58,6 +58,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
 		CreateMeshes();										//11. Create meshes (all use same triangle but different constant buffers)
 
+		CreateUAVResources();
+
 		WaitForGpu(QUEUE_TYPE_DIRECT);
 		
 		pool.push(Update);
@@ -384,6 +386,42 @@ void CreateViewportAndScissorRect()
 }
 #pragma endregion
 
+#pragma region CreateUAVResources
+void CreateUAVResources()
+{
+	D3D12_RESOURCE_DESC resDesc = {};
+	resDesc.DepthOrArraySize = 1;
+	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	resDesc.Width = SCREEN_WIDTH;
+	resDesc.Height = SCREEN_HEIGHT;
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	resDesc.MipLevels = 1;
+	resDesc.SampleDesc.Count = 1;
+
+	D3D12_HEAP_PROPERTIES hp = {};
+	hp.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+	HRESULT hr = gDevice5->CreateCommittedResource(
+		&hp, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&gUAVResource));
+
+	D3D12_DESCRIPTOR_HEAP_DESC dhd = {};
+	dhd.NumDescriptors = 1;
+	dhd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	dhd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+
+	hr = gDevice5->CreateDescriptorHeap(&dhd, IID_PPV_ARGS(&gUAVDesscriptorHeap));
+
+	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+
+	gDevice5->CreateUnorderedAccessView(gUAVResource, nullptr, &uavDesc, gUAVDesscriptorHeap->GetCPUDescriptorHandleForHeapStart());
+}
+#pragma endregion
+
+
+
 #pragma region CreateConstantBufferResources
 void CreateConstantBufferResources()
 {
@@ -447,14 +485,27 @@ void CreateRootSignature()
 	dtRanges[0].RegisterSpace = 0; //register(b0,space0);
 	dtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
+	// Compute shader UAV
+	D3D12_DESCRIPTOR_RANGE  cdtRanges[1];
+
+	cdtRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+	cdtRanges[0].NumDescriptors = 1; //only one CB in this example
+	cdtRanges[0].BaseShaderRegister = 0; //register u0
+	cdtRanges[0].RegisterSpace = 0; //register(u0,space0);
+	cdtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 	
 	//create a descriptor table
 	D3D12_ROOT_DESCRIPTOR_TABLE dt;
 	dt.NumDescriptorRanges = ARRAYSIZE(dtRanges);
 	dt.pDescriptorRanges = dtRanges;
 
+	//create a descriptor table
+	D3D12_ROOT_DESCRIPTOR_TABLE cdt;
+	cdt.NumDescriptorRanges = ARRAYSIZE(cdtRanges);
+	cdt.pDescriptorRanges = cdtRanges;
+
 	//create root parameter
-	D3D12_ROOT_PARAMETER rootParam[3];
+	D3D12_ROOT_PARAMETER rootParam[4];
 
 	// constant translate 
 	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
@@ -469,7 +520,12 @@ void CreateRootSignature()
 	// Texture
 	rootParam[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParam[2].DescriptorTable = dt;
-	rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; //used by both compute and pixel shader in the test version
+	
+	// UAV for compute shader
+	rootParam[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam[3].DescriptorTable = cdt;
+	rootParam[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; // Visible to compute
 
 
 	D3D12_ROOT_SIGNATURE_DESC rsDesc;
@@ -480,13 +536,20 @@ void CreateRootSignature()
 	rsDesc.pStaticSamplers = nullptr;
 
 	ID3DBlob* sBlob;
-	D3D12SerializeRootSignature(
+	ID3DBlob* errorBlob = nullptr;
+	HRESULT hr = D3D12SerializeRootSignature(
 		&rsDesc,
 		D3D_ROOT_SIGNATURE_VERSION_1,
 		&sBlob,
-		nullptr);
+		&errorBlob);
 
-	gDevice5->CreateRootSignature(
+	if (FAILED(hr)) {
+		OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+		errorBlob->Release();
+	}
+
+
+	hr = gDevice5->CreateRootSignature(
 		0,
 		sBlob->GetBufferPointer(),
 		sBlob->GetBufferSize(),
@@ -962,11 +1025,11 @@ void Render(int id)
 		//}
 
 		//Indicate that the back buffer will now be used to present.
-		SetResourceTransitionBarrier(directList,
-			gRenderTargets[backBufferIndex],
-			D3D12_RESOURCE_STATE_RENDER_TARGET,	//state before
-			D3D12_RESOURCE_STATE_PRESENT		//state after
-		);
+		//SetResourceTransitionBarrier(directList,
+		//	gRenderTargets[backBufferIndex],
+		//	D3D12_RESOURCE_STATE_RENDER_TARGET,	//state before
+		//	D3D12_RESOURCE_STATE_PRESENT		//state after
+		//);
 
 
 		//Close the list to prepare it for execution.
@@ -988,38 +1051,38 @@ void Render(int id)
 		gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 
 		directAllocator->Reset();
-		directList->Reset(directAllocator, gPassthroughPipeLineState);
+		directList->Reset(directAllocator, gPassthroughPipeLineState); //todo make compute pipeline state
 
 		//Set root signature
-		directList->SetGraphicsRootSignature(gRootSignature);
-
+		directList->SetComputeRootSignature(gRootSignature);
 
 		//Indicate that the back buffer will be used as render target.
 		SetResourceTransitionBarrier(directList,
 			gRenderTargets[backBufferIndex],
-			D3D12_RESOURCE_STATE_PRESENT,		//state before
-			D3D12_RESOURCE_STATE_RENDER_TARGET	//state after
+			D3D12_RESOURCE_STATE_RENDER_TARGET,		//state before
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE		//state after
 		);
 
+		ID3D12DescriptorHeap* dheap1[] = { gUAVDesscriptorHeap };
+		directList->SetDescriptorHeaps(_countof(dheap1), dheap1);
+		directList->SetComputeRootDescriptorTable(3, gUAVDesscriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
+		directList->Dispatch(16, 24, 1);
 
-		//Record commands.
-		//Get the handle for the current render target used as back buffer.
-		D3D12_CPU_DESCRIPTOR_HANDLE cdh = gRenderTargetsHeap->GetCPUDescriptorHandleForHeapStart();
-		cdh.ptr += gRenderTargetDescriptorSize * backBufferIndex;
+		SetResourceTransitionBarrier(directList,
+			gUAVResource,
+			D3D12_RESOURCE_STATE_UNORDERED_ACCESS,		//state before
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE		//state after
+		);
 
-		directList->OMSetRenderTargets(1, &cdh, true, nullptr);
-
-		
-
-		//Indicate that the back buffer will now be used to present.
+		//Indicate that the back buffer will be used as render target.
 		SetResourceTransitionBarrier(directList,
 			gRenderTargets[backBufferIndex],
-			D3D12_RESOURCE_STATE_RENDER_TARGET,	//state before
-			D3D12_RESOURCE_STATE_PRESENT		//state after
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,		//state before
+			D3D12_RESOURCE_STATE_RENDER_TARGET		//state after
 		);
 
-
+		
 		//Close the list to prepare it for execution.
 		directList->Close();
 
@@ -1049,12 +1112,12 @@ void Render(int id)
 		directList->RSSetViewports(1, &gViewport);
 		directList->RSSetScissorRects(1, &gScissorRect);
 
-		//Indicate that the back buffer will be used as render target.
-		SetResourceTransitionBarrier(directList,
-			gRenderTargets[backBufferIndex],
-			D3D12_RESOURCE_STATE_PRESENT,		//state before
-			D3D12_RESOURCE_STATE_RENDER_TARGET	//state after
-		);
+		////Indicate that the back buffer will be used as render target.
+		//SetResourceTransitionBarrier(directList,
+		//	gRenderTargets[backBufferIndex],
+		//	D3D12_RESOURCE_STATE_PRESENT,		//state before
+		//	D3D12_RESOURCE_STATE_RENDER_TARGET	//state after
+		//);
 
 		//Record commands.
 		//Get the handle for the current render target used as back buffer.
@@ -1066,20 +1129,25 @@ void Render(int id)
 		directList->ClearRenderTargetView(cdh, clearColor, 0, nullptr);
 
 		directList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		directList->IASetVertexBuffers(0, 1, &gVertexBufferView);
 
-		//get the current game state
-		bufferTransferLock.lock();
-		readOnlyState[index] = bufferState;
-		bufferTransferLock.unlock();
+		ID3D12DescriptorHeap* dheap[] = { gUAVDesscriptorHeap };
+		directList->SetDescriptorHeaps(_countof(dheap), dheap);
+		directList->SetGraphicsRootDescriptorTable(2, gUAVDesscriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 		directList->DrawInstanced(3, 1, 0, 0);
+
 
 		//Indicate that the back buffer will now be used to present.
 		SetResourceTransitionBarrier(directList,
 			gRenderTargets[backBufferIndex],
 			D3D12_RESOURCE_STATE_RENDER_TARGET,	//state before
 			D3D12_RESOURCE_STATE_PRESENT		//state after
+		);
+
+		SetResourceTransitionBarrier(directList,
+			gUAVResource,
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,		//state before
+			D3D12_RESOURCE_STATE_UNORDERED_ACCESS		//state after
 		);
 
 		//Close the list to prepare it for execution.
@@ -1092,8 +1160,8 @@ void Render(int id)
 		//gAllocatorsAndLists[(index + MAX_THREAD_COUNT - 1) % MAX_THREAD_COUNT][QUEUE_TYPE_DIRECT].isActive = false;
 
 		//Execute the command list.
-		ID3D12CommandList* listsToExecute2[] = { directList };
-		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
+		ID3D12CommandList* listsToExecute3[] = { directList };
+		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute3), listsToExecute3);
 
 
 		////! Passthrough

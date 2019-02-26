@@ -68,6 +68,7 @@ void CreatePassthroughShadersAndPiplelineState();
 
 void CreateTriangleData();									//8. Create vertexdata
 void CreateRootSignature();
+void CreateUAVResources();
 void CreateConstantBufferResources();
 void CreateMeshes();
 
@@ -203,6 +204,10 @@ ID3D12Resource1*			gRenderTargets[NUM_SWAP_BUFFERS] = {};
 UINT						gRenderTargetDescriptorSize = 0;
 //UINT						gFrameIndex							= 0;
 
+//Compute shader UAV
+ID3D12DescriptorHeap*		gUAVDesscriptorHeap = nullptr;
+ID3D12Resource1*			gUAVResource = nullptr;
+
 D3D12_VIEWPORT				gViewport = {};
 D3D12_RECT					gScissorRect = {};
 
@@ -227,6 +232,9 @@ struct ConstantBuffer
 
 ID3D12DescriptorHeap*	gDescriptorHeap[NUM_SWAP_BUFFERS] = {};
 ID3D12Resource1*		gConstantBufferResource[NUM_SWAP_BUFFERS] = {};
+
+
+
 //ConstantBuffer			gConstantBufferCPU								= {};
 #pragma endregion
 
