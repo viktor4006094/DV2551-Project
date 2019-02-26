@@ -355,6 +355,18 @@ void CreateRenderTargets()
 
 	HRESULT hr = gDevice5->CreateDescriptorHeap(&dhd, IID_PPV_ARGS(&gRenderTargetsHeap));
 	
+
+	// Create descriptor heap for SRV and UAV in compute shader
+	D3D12_DESCRIPTOR_HEAP_DESC cdhd = {};
+	cdhd.NumDescriptors = 2;
+	cdhd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	cdhd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+
+	hr = gDevice5->CreateDescriptorHeap(&cdhd, IID_PPV_ARGS(&gComputeDescriptorHeap));
+
+	
+
+
 	//Create resources for the render targets.
 	gRenderTargetDescriptorSize = gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	D3D12_CPU_DESCRIPTOR_HANDLE cdh = gRenderTargetsHeap->GetCPUDescriptorHandleForHeapStart();
@@ -404,19 +416,24 @@ void CreateUAVResources()
 	hp.Type = D3D12_HEAP_TYPE_DEFAULT;
 
 	HRESULT hr = gDevice5->CreateCommittedResource(
-		&hp, D3D12_HEAP_FLAG_NONE, &resDesc, D3D12_RESOURCE_STATE_COPY_SOURCE, nullptr, IID_PPV_ARGS(&gUAVResource));
+		&hp, D3D12_HEAP_FLAG_NONE, &resDesc, 
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gUAVResource));
+
+
 
 	D3D12_DESCRIPTOR_HEAP_DESC dhd = {};
 	dhd.NumDescriptors = 1;
 	dhd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	dhd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
-	hr = gDevice5->CreateDescriptorHeap(&dhd, IID_PPV_ARGS(&gUAVDesscriptorHeap));
+	hr = gDevice5->CreateDescriptorHeap(&dhd, IID_PPV_ARGS(&gComputeDescriptorHeap));
 
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 
-	gDevice5->CreateUnorderedAccessView(gUAVResource, nullptr, &uavDesc, gUAVDesscriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	gDevice5->CreateUnorderedAccessView(
+		gUAVResource, nullptr, &uavDesc, 
+		gComputeDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 }
 #pragma endregion
 
@@ -1051,21 +1068,23 @@ void Render(int id)
 		gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 
 		directAllocator->Reset();
-		directList->Reset(directAllocator, gPassthroughPipeLineState); //todo make compute pipeline state
+		directList->Reset(directAllocator, gComputePipeLineState);
 
 		//Set root signature
 		directList->SetComputeRootSignature(gRootSignature);
 
-		//Indicate that the back buffer will be used as render target.
 		SetResourceTransitionBarrier(directList,
 			gRenderTargets[backBufferIndex],
 			D3D12_RESOURCE_STATE_RENDER_TARGET,		//state before
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE		//state after
 		);
 
-		ID3D12DescriptorHeap* dheap1[] = { gUAVDesscriptorHeap };
+		
+		ID3D12DescriptorHeap* dheap1[] = { gComputeDescriptorHeap };
 		directList->SetDescriptorHeaps(_countof(dheap1), dheap1);
-		directList->SetComputeRootDescriptorTable(3, gUAVDesscriptorHeap->GetGPUDescriptorHandleForHeapStart());
+
+		//directList->SetComputeRootDescriptorTable(2, gComputeDescriptorHeap->);
+		directList->SetComputeRootDescriptorTable(3, gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 		directList->Dispatch(16, 24, 1);
 
@@ -1074,6 +1093,7 @@ void Render(int id)
 			D3D12_RESOURCE_STATE_UNORDERED_ACCESS,		//state before
 			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE		//state after
 		);
+
 
 		//Indicate that the back buffer will be used as render target.
 		SetResourceTransitionBarrier(directList,
@@ -1130,9 +1150,9 @@ void Render(int id)
 
 		directList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		ID3D12DescriptorHeap* dheap[] = { gUAVDesscriptorHeap };
+		ID3D12DescriptorHeap* dheap[] = { gComputeDescriptorHeap };
 		directList->SetDescriptorHeaps(_countof(dheap), dheap);
-		directList->SetGraphicsRootDescriptorTable(2, gUAVDesscriptorHeap->GetGPUDescriptorHandleForHeapStart());
+		directList->SetGraphicsRootDescriptorTable(2, gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 		directList->DrawInstanced(3, 1, 0, 0);
 

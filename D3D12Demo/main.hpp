@@ -204,8 +204,9 @@ ID3D12Resource1*			gRenderTargets[NUM_SWAP_BUFFERS] = {};
 UINT						gRenderTargetDescriptorSize = 0;
 //UINT						gFrameIndex							= 0;
 
-//Compute shader UAV
-ID3D12DescriptorHeap*		gUAVDesscriptorHeap = nullptr;
+//Compute shader UAV and SRV
+ID3D12Resource1*			gSRVofBackBuffer = nullptr;
+ID3D12DescriptorHeap*		gComputeDescriptorHeap = nullptr;
 ID3D12Resource1*			gUAVResource = nullptr;
 
 D3D12_VIEWPORT				gViewport = {};
@@ -214,7 +215,6 @@ D3D12_RECT					gScissorRect = {};
 ID3D12RootSignature*		gRootSignature = nullptr;
 ID3D12PipelineState*		gRenderPipeLineState = nullptr;
 ID3D12PipelineState*		gComputePipeLineState = nullptr;
-
 // only for testing
 ID3D12PipelineState*		gPassthroughPipeLineState = nullptr;
 
