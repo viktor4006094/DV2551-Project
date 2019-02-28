@@ -4,8 +4,7 @@
 #include <ctime>
 #include <string>
 
-#define _USE_MATH_DEFINES
-#include <math.h>
+
 
 #include <functional>
 
@@ -20,41 +19,43 @@ Project::~Project()
 
 void Project::Init(HWND wndHandle)
 {
+	// copy window handle so that we can change the title of the window later
+	mWndHandle = wndHandle;
+
+	gThreadPool = new ctpl::thread_pool(10);
+
 	CreateDirect3DDevice(wndHandle);					//2. Create Device
-
 	CreateCommandInterfacesAndSwapChain(wndHandle);	//3. Create CommandQueue and SwapChain
-
 	CreateFenceAndEventHandle();						//4. Create Fence and Event handle
-
 	CreateRenderTargets();								//5. Create render targets for backbuffer
-
 	CreateViewportAndScissorRect();						//6. Create viewport and rect
-
 	CreateRootSignature();								//7. Create root signature
-
 	CreateShadersAndPipelineStates();					//8. Set up the pipeline state
-
 	CreateConstantBufferResources();					//9. Create constant buffer data
-
 	CreateTriangleData();								//10. Create vertexdata
-
-	CreateMeshes();										//11. Create meshes (all use same triangle but different constant buffers)
-
+	mGameStateHandler.CreateMeshes();
+	//CreateMeshes();										//11. Create meshes (all use same triangle but different constant buffers)
 	CreateComputeShaderResources();
 
 	WaitForGpu(QUEUE_TYPE_DIRECT);
 }
 
-//todo fix
-// https://github.com/vit-vit/CTPL/issues/1
 void Project::Start()
 {
-	gThreadPool.push(Update);
-	gThreadPool.push(Render);
+	gThreadPool->push([this](int id) {mGameStateHandler.Update(id); });
+	gThreadPool->push([this](int id) {this->Render(id); });
 }
+
+void Project::Stop()
+{
+	isRunning = false;
+}
+
 
 void Project::Shutdown()
 {
+	mGameStateHandler.ShutDown();
+
 	WaitForGpu(QUEUE_TYPE_DIRECT); //todo DON'T
 
 	//CloseHandle(gEventHandle);
@@ -208,9 +209,9 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 	//to the underlying allocations in which GPU commands are stored.
 	//Create command list.
 	for (int i = 0; i < MAX_PREPARED_FRAMES; ++i) {
-		gAllocatorsAndLists[i][0].CreateCommandListAndAllocator(QUEUE_TYPE_DIRECT);
-		gAllocatorsAndLists[i][1].CreateCommandListAndAllocator(QUEUE_TYPE_COPY);
-		gAllocatorsAndLists[i][2].CreateCommandListAndAllocator(QUEUE_TYPE_COMPUTE);
+		gAllocatorsAndLists[i][0].CreateCommandListAndAllocator(QUEUE_TYPE_DIRECT, gDevice5);
+		gAllocatorsAndLists[i][1].CreateCommandListAndAllocator(QUEUE_TYPE_COPY, gDevice5);
+		gAllocatorsAndLists[i][2].CreateCommandListAndAllocator(QUEUE_TYPE_COMPUTE, gDevice5);
 	}
 
 	IDXGIFactory5*	factory = nullptr;
@@ -252,9 +253,9 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 
 void Project::CreateFenceAndEventHandle()
 {
-	gCommandQueues[QUEUE_TYPE_DIRECT].CreateFenceAndEventHandle();
-	gCommandQueues[QUEUE_TYPE_COPY].CreateFenceAndEventHandle();
-	gCommandQueues[QUEUE_TYPE_COMPUTE].CreateFenceAndEventHandle();
+	gCommandQueues[QUEUE_TYPE_DIRECT].CreateFenceAndEventHandle(gDevice5);
+	gCommandQueues[QUEUE_TYPE_COPY].CreateFenceAndEventHandle(gDevice5);
+	gCommandQueues[QUEUE_TYPE_COMPUTE].CreateFenceAndEventHandle(gDevice5);
 }
 
 void Project::CreateRenderTargets()
@@ -508,18 +509,6 @@ void Project::CreateTriangleData()
 		{ -0.05f, -0.05f, 0.0f, 1.0f }
 	};
 
-	//Vertex triangleVertices[3] =
-	//{
-	//	0.0f, 0.5f, 0.0f,	//v0 pos
-	//	//1.0f, 0.0f, 0.0f,	//v0 color
-
-	//	0.5f, -0.5f, 0.0f,	//v1
-	//	//0.0f, 1.0f, 0.0f,	//v1 color
-
-	//	-0.5f, -0.5f, 0.0f, //v2
-	//	//0.0f, 0.0f, 1.0f	//v2 color
-	//};
-
 	//Note: using upload heaps to transfer static data like vert buffers is not 
 	//recommended. Every time the GPU needs it, the upload heap will be marshalled 
 	//over. Please read up on Default Heap usage. An upload heap is used here for 
@@ -746,28 +735,7 @@ void Project::CreateConstantBufferResources()
 	}
 }
 
-void Project::CreateMeshes()
-{
-	// create the translation arrays used for moving the triangles around on the screen
-	float degToRad = (float)M_PI / 180.0f;
-	float scale = (float)TOTAL_PLACES / 359.9f;
-	for (int a = 0; a < TOTAL_PLACES; a++)
-	{
-		xt[a] = 0.8f * cosf(degToRad * ((float)a / scale) * 3.0f);
-		yt[a] = 0.8f * sinf(degToRad * ((float)a / scale) * 2.0f);
-	};
 
-	float fade = 1.0f / TOTAL_TRIS;
-	for (int i = 0; i < TOTAL_TRIS; ++i) {
-		TriangleObject m;
-
-		// initialize meshes with greyscale colors
-		float c = 1.0f - fade * i;
-		m.color = { c, c, c, 1.0 };
-
-		writeState.meshes.push_back(m);
-	}
-}
 
 void Project::CountFPS()
 {
@@ -782,62 +750,18 @@ void Project::CountFPS()
 		lastTime = std::chrono::high_resolution_clock::now();
 		int fps = frames * 4;
 		std::string windowText = "FPS " + std::to_string(fps);
-		SetWindowTextA(gWndHandle, windowText.c_str());
+		SetWindowTextA(mWndHandle, windowText.c_str());
 		frames = 0;
 	}
 }
 
 
-void Project::Update(int id)
-{
-	static auto startTime = std::chrono::high_resolution_clock::now();
-	while (gIsRunning) {
-		int meshInd = 0;
-		static long long shift = 0;
-		static double dshift = 0.0;
-		static double delta = 0.0;
-
-
-		for (auto &m : writeState.meshes) {
-
-			//Update color values in constant buffer
-			for (int i = 0; i < 3; i++)
-			{
-				//gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
-				m.color.values[i] += delta / 10000.0f * (i + 1);
-				if (m.color.values[i] > 1)
-				{
-					m.color.values[i] = 0;
-				}
-			}
-
-			//Update positions of each mesh
-			m.translate = ConstantBuffer{
-				xt[(int)(float)(meshInd * 10 + dshift) % (TOTAL_PLACES)],
-				yt[(int)(float)(meshInd * 10 + dshift) % (TOTAL_PLACES)],
-				meshInd * (-1.0f / TOTAL_PLACES),
-				0.0f
-			};
-
-			meshInd++;
-		}
-		shift += max((long long)(TOTAL_TRIS / 1000.0), (long long)(TOTAL_TRIS / 100.0));
-		delta = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - startTime).count();
-		dshift += delta * 50.0;
-		startTime = std::chrono::high_resolution_clock::now();
-
-		//copy updated gamestate to bufferstate
-		gBufferTransferLock.lock();
-		bufferState = writeState;
-		gBufferTransferLock.unlock();
-	}
-}
 
 void Project::Render(int id)
 {
 	static size_t lastRenderIterationIndex = 0;
 
-	if (gIsRunning) {
+	if (isRunning) {
 		thread_local int index;
 		CountFPS();
 
@@ -851,11 +775,8 @@ void Project::Render(int id)
 		//Command list allocators can only be reset when the associated command lists have
 		//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 		ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
-#ifdef VETTIG_DATOR
-		ID3D12GraphicsCommandList4*	commandList = gAllocatorsAndLists[QUEUE_TYPE_DIRECT].mCommandList;
-#else
-		ID3D12GraphicsCommandList3*	directList = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
-#endif
+		D3D12GraphicsCommandListPtr	directList  = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
+
 		ID3D12Fence1* fence = gCommandQueues[QUEUE_TYPE_DIRECT].mFence;
 		HANDLE eventHandle = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mEventHandle;
 
@@ -901,13 +822,16 @@ void Project::Render(int id)
 		directList->IASetVertexBuffers(0, 1, &gVertexBufferView);
 
 		//get the current game state
-		gBufferTransferLock.lock();
+		mGameStateHandler.writeNewestGameStateToReadOnlyAtIndex(index);
+		/*gBufferTransferLock.lock();
 		readOnlyState[index] = bufferState;
-		gBufferTransferLock.unlock();
+		gBufferTransferLock.unlock();*/
 
 		//Update constant buffers and draw triangles
 		//for (int i = 0; i < 100; ++i) {
-		for (auto &m : readOnlyState[index].meshes) {
+
+		
+		for (auto &m : mGameStateHandler.getReadOnlyStateAtIndex(index)->meshes) {
 			directList->SetGraphicsRoot32BitConstants(0, 4, &m.translate, 0);
 			directList->SetGraphicsRoot32BitConstants(1, 4, &m.color, 0);
 
@@ -937,18 +861,12 @@ void Project::Render(int id)
 		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
 
 
-
-
 		// Execute Compute shader
 		ComputePass(index);
 
 
-
-
 		// Passthrough
 		PassthroughPass(index);
-
-
 
 
 		//Present the frame.
@@ -974,7 +892,8 @@ void Project::Render(int id)
 		//todo wait for previous render call with this render target index to finish the JPEG part
 
 		// create new render thread
-		gThreadPool.push(Render);
+		//gThreadPool.push(Render);
+		gThreadPool->push([this](int id) {Render(id); });
 		//std::thread(Render).detach();
 
 	}
@@ -986,11 +905,8 @@ void Project::ComputePass(int index)
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
-#ifdef VETTIG_DATOR
-	ID3D12GraphicsCommandList4*	commandList = gAllocatorsAndLists[QUEUE_TYPE_DIRECT].mCommandList;
-#else
-	ID3D12GraphicsCommandList3*	directList = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
-#endif
+	D3D12GraphicsCommandListPtr directList  = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
+
 
 	//// Compute shader part ////
 
@@ -1056,11 +972,8 @@ void Project::PassthroughPass(int index)
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
-#ifdef VETTIG_DATOR
-	ID3D12GraphicsCommandList4*	commandList = gAllocatorsAndLists[QUEUE_TYPE_DIRECT].mCommandList;
-#else
-	ID3D12GraphicsCommandList3*	directList = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
-#endif
+	D3D12GraphicsCommandListPtr	directList = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
+
 
 	//// Passthrough ////
 

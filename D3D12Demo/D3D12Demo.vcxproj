@@ -147,6 +147,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="GameStateHandler.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Project.cpp" />
   </ItemGroup>
@@ -233,7 +234,9 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Globals.hpp" />
+    <ClInclude Include="GameStateHandler.hpp" />
+    <ClInclude Include="StructsAndEnums.hpp" />
+    <ClInclude Include="ConstantsAndGlobals.hpp" />
     <ClInclude Include="main.hpp" />
     <ClInclude Include="Project.hpp" />
   </ItemGroup>

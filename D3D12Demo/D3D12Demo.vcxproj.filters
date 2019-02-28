@@ -21,6 +21,9 @@
     <ClCompile Include="Project.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="GameStateHandler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="PixelShader.hlsl" />
@@ -36,7 +39,13 @@
     <ClInclude Include="Project.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Globals.hpp">
+    <ClInclude Include="StructsAndEnums.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ConstantsAndGlobals.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="GameStateHandler.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
