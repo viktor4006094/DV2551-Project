@@ -273,24 +273,24 @@ void Project::CreateRenderTargets()
 
 void Project::CreateViewportAndScissorRect()
 {
-	gViewport.TopLeftX = 0.0f;
-	gViewport.TopLeftY = 0.0f;
-	gViewport.Width = (float)SCREEN_WIDTH;
-	gViewport.Height = (float)SCREEN_HEIGHT;
-	gViewport.MinDepth = 0.0f;
-	gViewport.MaxDepth = 1.0f;
+	gViewport.TopLeftX	= 0.0f;
+	gViewport.TopLeftY	= 0.0f;
+	gViewport.Width		= (float)SCREEN_WIDTH;
+	gViewport.Height	= (float)SCREEN_HEIGHT;
+	gViewport.MinDepth	= 0.0f;
+	gViewport.MaxDepth	= 1.0f;
 
-	gScissorRect.left = (long)0;
-	gScissorRect.right = (long)SCREEN_WIDTH;
-	gScissorRect.top = (long)0;
+	gScissorRect.left	= (long)0;
+	gScissorRect.right	= (long)SCREEN_WIDTH;
+	gScissorRect.top	= (long)0;
 	gScissorRect.bottom = (long)SCREEN_HEIGHT;
 }
 
 void Project::CreateShadersAndPipelineStates()
 {
-	GPUStages[0]->Init(this);
-	GPUStages[1]->Init(this);
-	GPUStages[2]->Init(this);
+	GPUStages[0]->Init(gDevice5, gRootSignature);
+	GPUStages[1]->Init(gDevice5, gRootSignature);
+	GPUStages[2]->Init(gDevice5, gRootSignature);
 }
 
 
@@ -308,18 +308,18 @@ void Project::CreateTriangleData()
 	//over. Please read up on Default Heap usage. An upload heap is used here for 
 	//code simplicity and because there are very few vertices to actually transfer.
 	D3D12_HEAP_PROPERTIES hp = {};
-	hp.Type = D3D12_HEAP_TYPE_UPLOAD;
+	hp.Type				= D3D12_HEAP_TYPE_UPLOAD;
 	hp.CreationNodeMask = 1;
-	hp.VisibleNodeMask = 1;
+	hp.VisibleNodeMask	= 1;
 
 	D3D12_RESOURCE_DESC rd = {};
-	rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	rd.Width = sizeof(triangleVertices);
-	rd.Height = 1;
+	rd.Dimension		= D3D12_RESOURCE_DIMENSION_BUFFER;
+	rd.Width			= sizeof(triangleVertices);
+	rd.Height			= 1;
 	rd.DepthOrArraySize = 1;
-	rd.MipLevels = 1;
+	rd.MipLevels		= 1;
 	rd.SampleDesc.Count = 1;
-	rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	rd.Layout			= D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
 	//Creates both a resource and an implicit heap, such that the heap is big enough
 	//to contain the entire resource and the resource is mapped to the heap. 
@@ -342,26 +342,28 @@ void Project::CreateTriangleData()
 
 	//Initialize vertex buffer view, used in the render call.
 	gVertexBufferView.BufferLocation = gVertexBufferResource->GetGPUVirtualAddress();
-	gVertexBufferView.StrideInBytes = sizeof(Vertex);
-	gVertexBufferView.SizeInBytes = sizeof(triangleVertices);
+	gVertexBufferView.StrideInBytes  = sizeof(Vertex);
+	gVertexBufferView.SizeInBytes    = sizeof(triangleVertices);
 }
+
+
 void Project::CreateRootSignature()
 {
 	//define descriptor range(s)
 	D3D12_DESCRIPTOR_RANGE  dtRanges[1];
-	dtRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	dtRanges[0].NumDescriptors = 1; //only one CB in this example
-	dtRanges[0].BaseShaderRegister = 0; //register b0
-	dtRanges[0].RegisterSpace = 0; //register(b0,space0);
+	dtRanges[0].RangeType			= D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	dtRanges[0].NumDescriptors		= 1; //only one CB in this example
+	dtRanges[0].BaseShaderRegister	= 0; //register b0
+	dtRanges[0].RegisterSpace		= 0; //register(b0,space0);
 	dtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// Compute shader UAV
 	D3D12_DESCRIPTOR_RANGE  cdtRanges[1];
 
-	cdtRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-	cdtRanges[0].NumDescriptors = 1; //only one CB in this example
+	cdtRanges[0].RangeType			= D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+	cdtRanges[0].NumDescriptors		= 1; //only one CB in this example
 	cdtRanges[0].BaseShaderRegister = 0; //register u0
-	cdtRanges[0].RegisterSpace = 0; //register(u0,space0);
+	cdtRanges[0].RegisterSpace		= 0; //register(u0,space0);
 	cdtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	//create a descriptor table
@@ -445,8 +447,6 @@ void Project::CreateComputeShaderResources()
 	HRESULT hr = gDevice5->CreateCommittedResource(
 		&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gUAVResource));
-
-
 
 	D3D12_DESCRIPTOR_HEAP_DESC dhd = {};
 	dhd.NumDescriptors = NUM_SWAP_BUFFERS + 1;
@@ -543,7 +543,6 @@ void Project::Render(int id)
 	lastRenderIterationIndex = (++lastRenderIterationIndex) % MAX_PREPARED_FRAMES;
 	gThreadIDIndexLock.unlock();
 
-
 	if (isRunning) {
 		// Render geometry
 		GPUStages[0]->Run(index, this);
@@ -553,16 +552,14 @@ void Project::Render(int id)
 		// Execute Compute shader
 		GPUStages[1]->Run(index, this);
 
-
 		// Passthrough to show on screen
 		GPUStages[2]->Run(index, this);
-
-
 
 		//Present the frame.
 		DXGI_PRESENT_PARAMETERS pp = {};
 		gSwapChain4->Present1(0, 0, &pp);
 
+		gThreadPool->push([this](int id) {Render(id); });
 
 		//threadIDIndexLock.lock();
 		//// Signal that the execution of this list is done
@@ -583,7 +580,6 @@ void Project::Render(int id)
 
 		// create new render thread
 		//gThreadPool.push(Render);
-		gThreadPool->push([this](int id) {Render(id); });
 		//std::thread(Render).detach();
 
 	}

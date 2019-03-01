@@ -94,7 +94,7 @@ void ComputeStage::Run(int index, Project* p)
 		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,		//state before
 		D3D12_RESOURCE_STATE_RENDER_TARGET		//state after
 		//todo transition to present here when passthrough isn't used
-//		D3D12_RESOURCE_STATE_PRESENT		//state after 
+		//D3D12_RESOURCE_STATE_PRESENT		//state after 
 	);
 
 

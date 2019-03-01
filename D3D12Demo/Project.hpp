@@ -69,6 +69,12 @@ public:
 	UINT						gRenderTargetDescriptorSize = 0;
 	//UINT						gFrameIndex							= 0;
 
+	// todo in the render pass write to buffers that aren't in the swapchain
+	/*ID3D12DescriptorHeap*		gComputeInputTargetsHeap = nullptr;
+	ID3D12Resource1*			gComputeInputTargets[NUM_SWAP_BUFFERS] = {};
+	UINT						gComputeInputTargetDescriptorSize = 0;*/
+
+
 	//Compute shader UAV and SRV
 	ID3D12Resource1*			gSRVofBackBuffer = nullptr;
 	ID3D12DescriptorHeap*		gComputeDescriptorHeap = nullptr;
