@@ -37,6 +37,7 @@ void Project::Init(HWND wndHandle)
 	CreateViewportAndScissorRect();						//6. Create viewport and rect
 	CreateRootSignature();								//7. Create root signature
 	CreateShadersAndPipelineStates();					//8. Set up the pipeline state
+
 	CreateConstantBufferResources();					//9. Create constant buffer data
 	CreateTriangleData();								//10. Create vertexdata
 	mGameStateHandler.CreateMeshes();
@@ -101,7 +102,7 @@ void Project::Shutdown()
 	}
 
 	SafeRelease(&gRootSignature);
-	SafeRelease(&gRenderPipeLineState);
+	//SafeRelease(&gRenderPipeLineState);
 
 	SafeRelease(&gVertexBufferResource);
 }
@@ -287,207 +288,11 @@ void Project::CreateViewportAndScissorRect()
 
 void Project::CreateShadersAndPipelineStates()
 {
-	CreateRenderShadersAndPiplelineState();
-	CreateComputeShadersAndPiplelineState();
-	CreatePassthroughShadersAndPiplelineState();
+	GPUStages[0]->Init(this);
+	GPUStages[1]->Init(this);
+	GPUStages[2]->Init(this);
 }
 
-void Project::CreateRenderShadersAndPiplelineState()
-{
-	////// Shader Compiles //////
-	ID3DBlob* vertexBlob;
-	D3DCompileFromFile(
-		L"VertexShader.hlsl", // filename
-		nullptr,		// optional macros
-		nullptr,		// optional include files
-		"VS_main",		// entry point
-		"vs_5_0",		// shader model (target)
-		0,				// shader compile options			// here DEBUGGING OPTIONS
-		0,				// effect compile options
-		&vertexBlob,	// double pointer to ID3DBlob		
-		nullptr			// pointer for Error Blob messages.
-						// how to use the Error blob, see here
-						// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
-	);
-
-	ID3DBlob* pixelBlob;
-	D3DCompileFromFile(
-		L"PixelShader.hlsl", // filename
-		nullptr,		// optional macros
-		nullptr,		// optional include files
-		"PS_main",		// entry point
-		"ps_5_0",		// shader model (target)
-		0,				// shader compile options			// here DEBUGGING OPTIONS
-		0,				// effect compile options
-		&pixelBlob,		// double pointer to ID3DBlob		
-		nullptr			// pointer for Error Blob messages.
-						// how to use the Error blob, see here
-						// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
-	);
-
-	////// Input Layout //////
-	//D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {
-	//	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-	//	{ "COLOR"	, 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-	//};	
-	D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-	};
-
-	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc;
-	inputLayoutDesc.pInputElementDescs = inputElementDesc;
-	inputLayoutDesc.NumElements = ARRAYSIZE(inputElementDesc);
-
-	////// Pipline State //////
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC gpsd = {};
-
-	//Specify pipeline stages:
-	gpsd.pRootSignature = gRootSignature;
-	gpsd.InputLayout = inputLayoutDesc;
-	gpsd.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	gpsd.VS.pShaderBytecode = reinterpret_cast<void*>(vertexBlob->GetBufferPointer());
-	gpsd.VS.BytecodeLength = vertexBlob->GetBufferSize();
-	gpsd.PS.pShaderBytecode = reinterpret_cast<void*>(pixelBlob->GetBufferPointer());
-	gpsd.PS.BytecodeLength = pixelBlob->GetBufferSize();
-
-	//Specify render target and depthstencil usage.
-	gpsd.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-	gpsd.NumRenderTargets = 1;
-
-	gpsd.SampleDesc.Count = 1;
-	gpsd.SampleMask = UINT_MAX;
-
-	//Specify rasterizer behaviour.
-	gpsd.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-	gpsd.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
-
-	//Specify blend descriptions.
-	D3D12_RENDER_TARGET_BLEND_DESC defaultRTdesc = {
-		false, false,
-		D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-		D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-		D3D12_LOGIC_OP_NOOP, D3D12_COLOR_WRITE_ENABLE_ALL };
-	for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; i++)
-		gpsd.BlendState.RenderTarget[i] = defaultRTdesc;
-
-	gDevice5->CreateGraphicsPipelineState(&gpsd, IID_PPV_ARGS(&gRenderPipeLineState));
-}
-
-void Project::CreateComputeShadersAndPiplelineState()
-{
-	////// Shader Compiles //////
-	ID3DBlob* computeBlob;
-	D3DCompileFromFile(
-		L"CS_TestShader.hlsl", // filename
-		nullptr,		// optional macros
-		nullptr,		// optional include files
-		"CS_main",		// entry point
-		"cs_5_0",		// shader model (target)
-		0,				// shader compile options			// here DEBUGGING OPTIONS
-		0,				// effect compile options
-		&computeBlob,	// double pointer to ID3DBlob		
-		nullptr			// pointer for Error Blob messages.
-						// how to use the Error blob, see here
-						// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
-	);
-
-
-
-	////// Pipline State //////
-	D3D12_COMPUTE_PIPELINE_STATE_DESC cpsd = {};
-
-	//Specify pipeline stages:
-	cpsd.pRootSignature = gRootSignature;
-	cpsd.CS.pShaderBytecode = reinterpret_cast<void*>(computeBlob->GetBufferPointer());
-	cpsd.CS.BytecodeLength = computeBlob->GetBufferSize();
-
-	
-	gDevice5->CreateComputePipelineState(&cpsd, IID_PPV_ARGS(&gComputePipeLineState));
-}
-
-void Project::CreatePassthroughShadersAndPiplelineState()
-{
-	////// Shader Compiles //////
-	ID3DBlob* vertexBlob;
-	D3DCompileFromFile(
-		L"VS_FullScreenTriangle.hlsl", // filename
-		nullptr,		// optional macros
-		nullptr,		// optional include files
-		"VS_main",		// entry point
-		"vs_5_0",		// shader model (target)
-		0,				// shader compile options			// here DEBUGGING OPTIONS
-		0,				// effect compile options
-		&vertexBlob,	// double pointer to ID3DBlob		
-		nullptr			// pointer for Error Blob messages.
-						// how to use the Error blob, see here
-						// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
-	);
-
-	ID3DBlob* pixelBlob;
-	D3DCompileFromFile(
-		L"PS_Passthrough.hlsl", // filename
-		nullptr,		// optional macros
-		nullptr,		// optional include files
-		"PS_main",		// entry point
-		"ps_5_0",		// shader model (target)
-		0,				// shader compile options			// here DEBUGGING OPTIONS
-		0,				// effect compile options
-		&pixelBlob,		// double pointer to ID3DBlob		
-		nullptr			// pointer for Error Blob messages.
-						// how to use the Error blob, see here
-						// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
-	);
-
-	////// Input Layout //////
-	//D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {
-	//	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-	//	{ "COLOR"	, 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-	//};	
-
-
-	// Empty input layout
-	D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-	};
-
-	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc;
-	inputLayoutDesc.pInputElementDescs = inputElementDesc;
-	inputLayoutDesc.NumElements = ARRAYSIZE(inputElementDesc);
-
-	////// Pipline State //////
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC gpsd = {};
-
-	//Specify pipeline stages:
-	gpsd.pRootSignature = gRootSignature;
-	gpsd.InputLayout = inputLayoutDesc;
-	gpsd.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	gpsd.VS.pShaderBytecode = reinterpret_cast<void*>(vertexBlob->GetBufferPointer());
-	gpsd.VS.BytecodeLength = vertexBlob->GetBufferSize();
-	gpsd.PS.pShaderBytecode = reinterpret_cast<void*>(pixelBlob->GetBufferPointer());
-	gpsd.PS.BytecodeLength = pixelBlob->GetBufferSize();
-
-	//Specify render target and depthstencil usage.
-	gpsd.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-	gpsd.NumRenderTargets = 1;
-
-	gpsd.SampleDesc.Count = 1;
-	gpsd.SampleMask = UINT_MAX;
-
-	//Specify rasterizer behaviour.
-	gpsd.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-	gpsd.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
-
-	//Specify blend descriptions.
-	D3D12_RENDER_TARGET_BLEND_DESC defaultRTdesc = {
-		false, false,
-		D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-		D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-		D3D12_LOGIC_OP_NOOP, D3D12_COLOR_WRITE_ENABLE_ALL };
-	for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; i++)
-		gpsd.BlendState.RenderTarget[i] = defaultRTdesc;
-
-	gDevice5->CreateGraphicsPipelineState(&gpsd, IID_PPV_ARGS(&gPassthroughPipeLineState));
-}
 
 void Project::CreateTriangleData()
 {

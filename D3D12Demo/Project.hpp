@@ -42,9 +42,6 @@ public:
 	void CreateViewportAndScissorRect();						//6. Create viewport and rect
 
 	void CreateShadersAndPipelineStates();						//7. Set up the pipeline states
-	void CreateRenderShadersAndPiplelineState();
-	void CreateComputeShadersAndPiplelineState();
-	void CreatePassthroughShadersAndPiplelineState();
 
 	void CreateTriangleData();									//8. Create vertexdata
 	void CreateRootSignature();
@@ -81,10 +78,10 @@ public:
 	D3D12_RECT					gScissorRect = {};
 
 	ID3D12RootSignature*		gRootSignature = nullptr;
-	ID3D12PipelineState*		gRenderPipeLineState = nullptr;
-	ID3D12PipelineState*		gComputePipeLineState = nullptr;
+	//ID3D12PipelineState*		gRenderPipeLineState = nullptr;
+	//ID3D12PipelineState*		gComputePipeLineState = nullptr;
 	// only for testing
-	ID3D12PipelineState*		gPassthroughPipeLineState = nullptr;
+	//ID3D12PipelineState*		gPassthroughPipeLineState = nullptr;
 
 
 	ID3D12Resource1*			gVertexBufferResource = nullptr;

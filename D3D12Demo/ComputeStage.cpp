@@ -11,6 +11,38 @@ ComputeStage::~ComputeStage()
 
 }
 
+void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
+{
+	////// Shader Compiles //////
+	ID3DBlob* computeBlob;
+	D3DCompileFromFile(
+		L"CS_TestShader.hlsl", // filename
+		nullptr,		// optional macros
+		nullptr,		// optional include files
+		"CS_main",		// entry point
+		"cs_5_0",		// shader model (target)
+		0,				// shader compile options			// here DEBUGGING OPTIONS
+		0,				// effect compile options
+		&computeBlob,	// double pointer to ID3DBlob		
+		nullptr			// pointer for Error Blob messages.
+						// how to use the Error blob, see here
+						// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
+	);
+
+
+
+	////// Pipline State //////
+	D3D12_COMPUTE_PIPELINE_STATE_DESC cpsd = {};
+
+	//Specify pipeline stages:
+	cpsd.pRootSignature = rootSig;
+	cpsd.CS.pShaderBytecode = reinterpret_cast<void*>(computeBlob->GetBufferPointer());
+	cpsd.CS.BytecodeLength = computeBlob->GetBufferSize();
+
+
+	dev->CreateComputePipelineState(&cpsd, IID_PPV_ARGS(&mPipelineState));
+}
+
 void ComputeStage::Run(int index, Project* p)
 {
 	UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
@@ -25,7 +57,7 @@ void ComputeStage::Run(int index, Project* p)
 	p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 
 	directAllocator->Reset();
-	directList->Reset(directAllocator, p->gComputePipeLineState);
+	directList->Reset(directAllocator, mPipelineState);
 
 	//Set root signature
 	directList->SetComputeRootSignature(p->gRootSignature);

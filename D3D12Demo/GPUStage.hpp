@@ -12,6 +12,8 @@ public:
 	GPUStage() {}
 	virtual ~GPUStage() {}
 
+	virtual void Init(Project* p) = 0;
+
 	void Stop() { isRunning = false; }
 
 	virtual void Run(int index, Project* p) = 0;
