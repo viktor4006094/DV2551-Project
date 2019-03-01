@@ -12,6 +12,8 @@
 
 #include "..\extLib\ctpl_stl.h"
 
+#include "GPUStage.hpp"
+
 
 #pragma comment (lib, "d3d12.lib")
 #pragma comment (lib, "DXGI.lib")
@@ -21,6 +23,8 @@
 class Project
 {
 public:
+	friend class GPUStage;
+
 	Project();
 	~Project();
 
@@ -31,9 +35,6 @@ public:
 
 	//Helper function for syncronization of GPU/CPU
 	void WaitForGpu(QueueType type);
-	//Helper function for resource transitions
-	void SetResourceTransitionBarrier(ID3D12GraphicsCommandList* commandList, ID3D12Resource* resource,
-		D3D12_RESOURCE_STATES StateBefore, D3D12_RESOURCE_STATES StateAfter);
 	void CreateDirect3DDevice(HWND wndHandle);					//2. Create Device
 	void CreateCommandInterfacesAndSwapChain(HWND wndHandle);	//3. Create CommandQueue and SwapChain
 	void CreateFenceAndEventHandle();							//4. Create Fence and Event handle
@@ -51,11 +52,9 @@ public:
 	void CreateConstantBufferResources();
 	//void CreateMeshes();
 
-	void CountFPS();
+	//void CountFPS();
 	//void Update(int id);
 	void Render(int id);
-	void ComputePass(int index);
-	void PassthroughPass(int index);
 
 
 
@@ -92,7 +91,7 @@ public:
 	D3D12_VERTEX_BUFFER_VIEW	gVertexBufferView = {};
 
 
-
+	// Constant buffers
 	ID3D12DescriptorHeap*	gDescriptorHeap[NUM_SWAP_BUFFERS] = {};
 	ID3D12Resource1*		gConstantBufferResource[NUM_SWAP_BUFFERS] = {};
 
@@ -105,6 +104,8 @@ public:
 
 	bool isRunning = true;
 private:
+
+	GPUStage* GPUStages[3];
 
 #pragma region GameState
 

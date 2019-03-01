@@ -3,6 +3,8 @@
 #include <d3d12.h>
 #include "ConstantsAndGlobals.hpp"
 
+#include <string>
+
 template<class Interface>
 inline void SafeRelease(Interface **ppInterfaceToRelease)
 {
@@ -11,6 +13,46 @@ inline void SafeRelease(Interface **ppInterfaceToRelease)
 		(*ppInterfaceToRelease) = NULL;
 	}
 }
+
+//Helper function for resource transitions
+inline void SetResourceTransitionBarrier(
+	ID3D12GraphicsCommandList* commandList,
+	ID3D12Resource* resource,
+	D3D12_RESOURCE_STATES StateBefore,
+	D3D12_RESOURCE_STATES StateAfter)
+{
+	D3D12_RESOURCE_BARRIER barrierDesc = {};
+
+	barrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrierDesc.Transition.pResource = resource;
+	barrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	barrierDesc.Transition.StateBefore = StateBefore;
+	barrierDesc.Transition.StateAfter = StateAfter;
+
+	commandList->ResourceBarrier(1, &barrierDesc);
+}
+
+
+inline void CountFPS(HWND wndHandle)
+{
+	// FPS counter
+	static auto lastTime = std::chrono::high_resolution_clock::now();
+	static int frames = 0;
+	auto currentTime = std::chrono::high_resolution_clock::now();
+	frames++;
+
+
+	std::chrono::duration<double, std::milli> delta = currentTime - lastTime;
+	if (delta >= std::chrono::duration<double, std::milli>(250)) {
+		lastTime = std::chrono::high_resolution_clock::now();
+		int fps = frames * 4;
+		std::string windowText = "FPS " + std::to_string(fps);
+		SetWindowTextA(wndHandle, windowText.c_str());
+		frames = 0;
+	}
+}
+
+
 
 #pragma region Enums
 enum QueueType : size_t {
