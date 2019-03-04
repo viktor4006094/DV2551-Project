@@ -147,8 +147,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ComputeShader.cpp" />
     <ClCompile Include="ComputeStage.cpp" />
     <ClCompile Include="GameStateHandler.cpp" />
+    <ClCompile Include="JEnc.cpp" />
+    <ClCompile Include="JpegEncoderBase.cpp" />
+    <ClCompile Include="JpegEncoderGPU.cpp" />
+    <ClCompile Include="JpegEncoderGPU_444.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PassThroughStage.cpp" />
     <ClCompile Include="Project.cpp" />
@@ -168,6 +173,20 @@
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CS_main</EntryPointName>
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CS_main</EntryPointName>
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CS_main</EntryPointName>
+    </FxCompile>
+    <FxCompile Include="Jpeg_CS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">5.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">5.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">ComputeJPEG</EntryPointName>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">ComputeJPEG</EntryPointName>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">ComputeJPEG</EntryPointName>
+      <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">ComputeJPEG</EntryPointName>
     </FxCompile>
     <FxCompile Include="PixelShader.hlsl">
       <EntryPointName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">PS_main</EntryPointName>
@@ -237,11 +256,19 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ComputeShader.h" />
     <ClInclude Include="ComputeStage.hpp" />
     <ClInclude Include="GameStateHandler.hpp" />
     <ClInclude Include="GPUStage.hpp" />
+    <ClInclude Include="Jenc.h" />
+    <ClInclude Include="JEncCommon.h" />
+    <ClInclude Include="JpegCommon.h" />
+    <ClInclude Include="JpegEncoderBase.h" />
+    <ClInclude Include="JpegEncoderGPU.h" />
+    <ClInclude Include="JpegEncoderGPU_444.h" />
     <ClInclude Include="PassThroughStage.hpp" />
     <ClInclude Include="RenderStage.hpp" />
+    <ClInclude Include="stdafx.h" />
     <ClInclude Include="StructsAndEnums.hpp" />
     <ClInclude Include="ConstantsAndGlobals.hpp" />
     <ClInclude Include="main.hpp" />

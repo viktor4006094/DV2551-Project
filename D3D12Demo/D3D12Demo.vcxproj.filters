@@ -22,6 +22,21 @@
     <Filter Include="Header Files\Common">
       <UniqueIdentifier>{1d1fc929-8309-4d86-aaa0-a1a8014ba8ea}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\JPEG Encoder">
+      <UniqueIdentifier>{ad2a2171-b41b-487b-b471-25006b7e4db9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\JPEG Encoder\GPU">
+      <UniqueIdentifier>{e3323419-9597-4b0a-a187-19f871704373}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\JPEG Encoder">
+      <UniqueIdentifier>{ed57900e-5270-4e77-881a-92dbec94dc2b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\JPEG Encoder\GPU">
+      <UniqueIdentifier>{5aa75307-1990-40d6-8d83-dffbf23cf557}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Shaders">
+      <UniqueIdentifier>{93c0f7ad-1624-4707-895e-f6744b95f5ec}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -42,13 +57,41 @@
     <ClCompile Include="RenderStage.cpp">
       <Filter>Source Files\GPUStages</Filter>
     </ClCompile>
+    <ClCompile Include="JpegEncoderBase.cpp">
+      <Filter>Source Files\JPEG Encoder</Filter>
+    </ClCompile>
+    <ClCompile Include="JpegEncoderGPU.cpp">
+      <Filter>Source Files\JPEG Encoder\GPU</Filter>
+    </ClCompile>
+    <ClCompile Include="JpegEncoderGPU_444.cpp">
+      <Filter>Source Files\JPEG Encoder\GPU</Filter>
+    </ClCompile>
+    <ClCompile Include="ComputeShader.cpp">
+      <Filter>Source Files\JPEG Encoder</Filter>
+    </ClCompile>
+    <ClCompile Include="JEnc.cpp">
+      <Filter>Source Files\JPEG Encoder</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="PixelShader.hlsl" />
-    <FxCompile Include="VertexShader.hlsl" />
-    <FxCompile Include="VS_FullScreenTriangle.hlsl" />
-    <FxCompile Include="CS_TestShader.hlsl" />
-    <FxCompile Include="PS_Passthrough.hlsl" />
+    <FxCompile Include="CS_TestShader.hlsl">
+      <Filter>Source Files\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="PixelShader.hlsl">
+      <Filter>Source Files\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="PS_Passthrough.hlsl">
+      <Filter>Source Files\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="VertexShader.hlsl">
+      <Filter>Source Files\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="VS_FullScreenTriangle.hlsl">
+      <Filter>Source Files\Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Jpeg_CS.hlsl">
+      <Filter>Source Files\Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.hpp">
@@ -77,6 +120,30 @@
     </ClInclude>
     <ClInclude Include="ConstantsAndGlobals.hpp">
       <Filter>Header Files\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="stdafx.h">
+      <Filter>Header Files\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="JpegCommon.h">
+      <Filter>Header Files\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="JpegEncoderBase.h">
+      <Filter>Header Files\JPEG Encoder</Filter>
+    </ClInclude>
+    <ClInclude Include="JpegEncoderGPU.h">
+      <Filter>Header Files\JPEG Encoder\GPU</Filter>
+    </ClInclude>
+    <ClInclude Include="JpegEncoderGPU_444.h">
+      <Filter>Header Files\JPEG Encoder\GPU</Filter>
+    </ClInclude>
+    <ClInclude Include="Jenc.h">
+      <Filter>Header Files\JPEG Encoder</Filter>
+    </ClInclude>
+    <ClInclude Include="JEncCommon.h">
+      <Filter>Header Files\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="ComputeShader.h">
+      <Filter>Header Files\JPEG Encoder</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

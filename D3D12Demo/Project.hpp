@@ -13,7 +13,7 @@
 #include "..\extLib\ctpl_stl.h"
 
 #include "GPUStage.hpp"
-
+#include "Jenc.h"
 
 #pragma comment (lib, "d3d12.lib")
 #pragma comment (lib, "DXGI.lib")
@@ -106,6 +106,9 @@ public:
 	HWND mWndHandle;
 
 	bool isRunning = true;
+
+
+	JEnc* JPEGEncoder = nullptr;
 private:
 
 	GPUStage* GPUStages[3];
