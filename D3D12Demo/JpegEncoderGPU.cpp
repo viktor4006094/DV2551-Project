@@ -7,27 +7,26 @@
 
 #include <tchar.h>
 
-JpegEncoderGPU::JpegEncoderGPU(ID3D11Device* d3dDevice, ID3D11DeviceContext* d3dContext)
-	: mD3DDevice(d3dDevice), mD3DDeviceContext(d3dContext)
+JpegEncoderGPU::JpegEncoderGPU()
 {
-	_tcscpy_s(mComputeShaderFile, _T("../Shaders/Jpeg_CS.hlsl"));
+	//_tcscpy_s(mComputeShaderFile, _T("../Shaders/Jpeg_CS.hlsl"));
 
-	mCB_ImageData_Y = NULL;
-	mCB_ImageData_CbCr = NULL;
+	//mCB_ImageData_Y = NULL;
+	//mCB_ImageData_CbCr = NULL;
 
-	mCT_RGBA = NULL;
+	//mCT_RGBA = NULL;
 
-	mCB_EntropyResult = NULL;
+	//mCB_EntropyResult = NULL;
 
-	mCB_Huff_Y_AC = NULL;
-	mCB_Huff_CbCr_AC = NULL;
+	//mCB_Huff_Y_AC = NULL;
+	//mCB_Huff_CbCr_AC = NULL;
 
-	mCB_DCT_Matrix = NULL;
-	mCB_DCT_Matrix_Transpose = NULL;
-	mCB_Y_Quantization_Table = NULL;
-	mCB_CbCr_Quantization_Table = NULL;
+	//mCB_DCT_Matrix = NULL;
+	//mCB_DCT_Matrix_Transpose = NULL;
+	//mCB_Y_Quantization_Table = NULL;
+	//mCB_CbCr_Quantization_Table = NULL;
 
-	mCB_SamplerState_PointClamp = NULL;
+	//mCB_SamplerState_PointClamp = NULL;
 
 	mImageWidth = 0;
 	mImageHeight = 0;
@@ -35,10 +34,10 @@ JpegEncoderGPU::JpegEncoderGPU(ID3D11Device* d3dDevice, ID3D11DeviceContext* d3d
 
 	mDoCreateBuffers = true;
 
-	mComputeSys = new ComputeWrap(d3dDevice, d3dContext);
-	mShader_Y_Component = NULL;
-	mShader_Cb_Component = NULL;
-	mShader_Cr_Component = NULL;
+	//mComputeSys = new ComputeWrap(d3dDevice, d3dContext);
+	//mShader_Y_Component = NULL;
+	//mShader_Cb_Component = NULL;
+	//mShader_Cr_Component = NULL;
 }
 
 JpegEncoderGPU::~JpegEncoderGPU()
@@ -50,33 +49,33 @@ JpegEncoderGPU::~JpegEncoderGPU()
 
 void JpegEncoderGPU::ReleaseShaders()
 {
-	SAFE_DELETE(mComputeSys);
-	SAFE_DELETE(mShader_Y_Component);
-	SAFE_DELETE(mShader_Cb_Component);
-	SAFE_DELETE(mShader_Cr_Component);
+	//SAFE_DELETE(mComputeSys);
+	//SAFE_DELETE(mShader_Y_Component);
+	//SAFE_DELETE(mShader_Cb_Component);
+	//SAFE_DELETE(mShader_Cr_Component);
 }
 
 void JpegEncoderGPU::ReleaseBuffers()
 {
-	SAFE_RELEASE(mCB_ImageData_Y);
-	SAFE_RELEASE(mCB_ImageData_CbCr);
-	SAFE_DELETE(mCT_RGBA);
-
-	SAFE_DELETE(mCB_EntropyResult);
-
-	SAFE_DELETE(mCB_Huff_Y_AC);
-	SAFE_DELETE(mCB_Huff_CbCr_AC);
-
-	SAFE_DELETE(mCB_DCT_Matrix);
-	SAFE_DELETE(mCB_DCT_Matrix_Transpose);
-
-	SAFE_RELEASE(mCB_SamplerState_PointClamp);
+//	SAFE_RELEASE(mCB_ImageData_Y);
+//	SAFE_RELEASE(mCB_ImageData_CbCr);
+//	SAFE_DELETE(mCT_RGBA);
+//
+//	SAFE_DELETE(mCB_EntropyResult);
+//
+//	SAFE_DELETE(mCB_Huff_Y_AC);
+//	SAFE_DELETE(mCB_Huff_CbCr_AC);
+//
+//	SAFE_DELETE(mCB_DCT_Matrix);
+//	SAFE_DELETE(mCB_DCT_Matrix_Transpose);
+//
+//	SAFE_RELEASE(mCB_SamplerState_PointClamp);
 }
 
 void JpegEncoderGPU::ReleaseQuantizationBuffers()
 {
-	SAFE_DELETE(mCB_Y_Quantization_Table);
-	SAFE_DELETE(mCB_CbCr_Quantization_Table);
+	//SAFE_DELETE(mCB_Y_Quantization_Table);
+	//SAFE_DELETE(mCB_CbCr_Quantization_Table);
 }
 
 void JpegEncoderGPU::DoHuffmanEncoding(int* DU, short& prevDC, BitString* HTDC)
@@ -130,9 +129,10 @@ void JpegEncoderGPU::DoHuffmanEncoding(int* DU, short& prevDC, BitString* HTDC)
 	}
 }
 
-void JpegEncoderGPU::Dispatch()
-{
-	ID3D11UnorderedAccessView* aUAVViews[] = { mCB_EntropyResult->GetUnorderedAccessView() };
+//! Done in JPEGStage instead
+//void JpegEncoderGPU::Dispatch()
+//{
+	/*ID3D11UnorderedAccessView* aUAVViews[] = { mCB_EntropyResult->GetUnorderedAccessView() };
 	mD3DDeviceContext->CSSetUnorderedAccessViews(0, sizeof(aUAVViews) / sizeof(aUAVViews[0]), aUAVViews, NULL);
 
 
@@ -158,9 +158,10 @@ void JpegEncoderGPU::Dispatch()
 
 	mShader_Cr_Component->Set();
 	mD3DDeviceContext->Dispatch(mNumComputationBlocks_CbCr[0], mNumComputationBlocks_CbCr[1], 1);
-	mShader_Cr_Component->Unset();
-}
+	mShader_Cr_Component->Unset();*/
+//}
 
+//todo update relevant buffers in project.hpp from here
 void JpegEncoderGPU::QuantizationTablesChanged()
 {
 	for (int i = 0; i < 64; i++)
@@ -169,7 +170,7 @@ void JpegEncoderGPU::QuantizationTablesChanged()
 		CbCr_Quantization_Table_Float[i] = (float)CbCr_Quantization_Table[i];
 	}
 
-	D3D11_BOX box;
+	D3D12_BOX box;
 	box.left = 0;
 	box.right = sizeof(float) * 64;
 	box.top = 0;
@@ -180,7 +181,8 @@ void JpegEncoderGPU::QuantizationTablesChanged()
 
 	ReleaseQuantizationBuffers();
 
-	if (mCB_Y_Quantization_Table == NULL)
+	//todo do this but with buffers in project.hpp
+	/*if (mCB_Y_Quantization_Table == NULL)
 		mCB_Y_Quantization_Table = mComputeSys->CreateBuffer(STRUCTURED_BUFFER, sizeof(float), 64, true, false, Y_Quantization_Table_Float, false, "mCB_Y_Quantization_Table");
 	else
 		mD3DDeviceContext->UpdateSubresource(mCB_Y_Quantization_Table->GetResource(), 0, &box, Y_Quantization_Table_Float, 0, 0);
@@ -188,14 +190,15 @@ void JpegEncoderGPU::QuantizationTablesChanged()
 	if (mCB_CbCr_Quantization_Table == NULL)
 		mCB_CbCr_Quantization_Table = mComputeSys->CreateBuffer(STRUCTURED_BUFFER, sizeof(float), 64, true, false, CbCr_Quantization_Table_Float, false, "mCB_CbCr_Quantization_Table");
 	else
-		mD3DDeviceContext->UpdateSubresource(mCB_CbCr_Quantization_Table->GetResource(), 0, &box, CbCr_Quantization_Table_Float, 0, 0);
+		mD3DDeviceContext->UpdateSubresource(mCB_CbCr_Quantization_Table->GetResource(), 0, &box, CbCr_Quantization_Table_Float, 0, 0);*/
 
 	mDoCreateBuffers = true;
 }
 
-void JpegEncoderGPU::DoQuantization(ID3D11ShaderResourceView* pSRV)
-{
-	ID3D11ShaderResourceView* aRViews[] =
+//! Moved to JPEGStage::Run
+//void JpegEncoderGPU::DoQuantization(ID3D11ShaderResourceView* pSRV)
+//{
+	/*ID3D11ShaderResourceView* aRViews[] =
 	{
 		mCB_DCT_Matrix->GetResourceView(),
 		mCB_DCT_Matrix_Transpose->GetResourceView(),
@@ -218,8 +221,8 @@ void JpegEncoderGPU::DoQuantization(ID3D11ShaderResourceView* pSRV)
 	mD3DDeviceContext->CSSetUnorderedAccessViews(0, 8, ppUAViewNULL, NULL);
 
 	ID3D11ShaderResourceView* ppSRVNULL[5] = { NULL };
-	mD3DDeviceContext->CSSetShaderResources(0, 5, ppSRVNULL);
-}
+	mD3DDeviceContext->CSSetShaderResources(0, 5, ppSRVNULL);*/
+//}
 
 int JpegEncoderGPU::CalculateBufferSize(int quality)
 {
@@ -236,64 +239,65 @@ int JpegEncoderGPU::CalculateBufferSize(int quality)
 	return size;
 }
 
-HRESULT JpegEncoderGPU::CreateBuffers()
-{
-	ReleaseBuffers();
-
-	int width = mComputationWidthY;
-	int height = mComputationHeightY;
-
-	//recalculate buffer size
-	mEntropyBlockSize = CalculateBufferSize(mQualitySetting);
-
-	mCB_EntropyResult = mComputeSys->CreateBuffer(
-		STRUCTURED_BUFFER,
-		sizeof(int),
-		(mNumComputationBlocks_Y[0] * mNumComputationBlocks_Y[1] + mNumComputationBlocks_CbCr[0] * mNumComputationBlocks_CbCr[1] * 2) * mEntropyBlockSize,
-		false,
-		true,
-		NULL,
-		true,
-		"mCB_EntropyResult");
-
-	mCB_Huff_Y_AC = mComputeSys->CreateBuffer(STRUCTURED_BUFFER, sizeof(BitString), 256, true, false, Y_AC_Huffman_Table, false, "mCB_Huff_Y_AC");
-	mCB_Huff_CbCr_AC = mComputeSys->CreateBuffer(STRUCTURED_BUFFER, sizeof(BitString), 256, true, false, Cb_AC_Huffman_Table, false, "mCB_Huff_CbCr_AC");
-
-	mCB_DCT_Matrix = mComputeSys->CreateBuffer(STRUCTURED_BUFFER, sizeof(float), 64, true, false, DCT_matrix, false, "mCB_DCT_Matrix");
-	mCB_DCT_Matrix_Transpose = mComputeSys->CreateBuffer(STRUCTURED_BUFFER, sizeof(float), 64, true, false, DCT_matrix_transpose, false, "mCB_DCT_Matrix_Transpose");
-
-	ImageData id;
-	id.ImageWidth = (float)mImageWidth;
-	id.ImageHeight = (float)mImageHeight;
-	id.EntropyBlockSize = mEntropyBlockSize;
-
-	id.NumBlocksX = mNumComputationBlocks_Y[0];
-	id.NumBlocksY = mNumComputationBlocks_Y[1];
-
-	mCB_ImageData_Y = mComputeSys->CreateConstantBuffer(sizeof(ImageData), &id, "mCB_ImageData_Y");
-
-	id.NumBlocksX = mNumComputationBlocks_CbCr[0];
-	id.NumBlocksY = mNumComputationBlocks_CbCr[1];
-	mCB_ImageData_CbCr = mComputeSys->CreateConstantBuffer(sizeof(ImageData), &id, "mCB_ImageData_CbCr");
-
-
-	D3D11_SAMPLER_DESC samplerDesc;
-	ZeroMemory(&samplerDesc, sizeof(samplerDesc));
-	samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
-	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-	samplerDesc.MipLODBias = 0.0f;
-	samplerDesc.MaxAnisotropy = 1;
-	samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER; //ALWAYS;
-	samplerDesc.MinLOD = 0; //-D3D11_FLOAT32_MAX;
-	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
-
-
-	HRESULT hr = mD3DDevice->CreateSamplerState(&samplerDesc, &mCB_SamplerState_PointClamp);
-
-	return S_OK;
-}
+//todo do in Project.cpp instead and with correect sizes
+//HRESULT JpegEncoderGPU::CreateBuffers()
+//{
+//	ReleaseBuffers();
+//
+//	int width = mComputationWidthY;
+//	int height = mComputationHeightY;
+//
+//	//recalculate buffer size
+//	mEntropyBlockSize = CalculateBufferSize(mQualitySetting);
+//
+//	mCB_EntropyResult = mComputeSys->CreateBuffer(
+//		STRUCTURED_BUFFER,
+//		sizeof(int),
+//		(mNumComputationBlocks_Y[0] * mNumComputationBlocks_Y[1] + mNumComputationBlocks_CbCr[0] * mNumComputationBlocks_CbCr[1] * 2) * mEntropyBlockSize,
+//		false,
+//		true,
+//		NULL,
+//		true,
+//		"mCB_EntropyResult");
+//
+//	mCB_Huff_Y_AC = mComputeSys->CreateBuffer(STRUCTURED_BUFFER, sizeof(BitString), 256, true, false, Y_AC_Huffman_Table, false, "mCB_Huff_Y_AC");
+//	mCB_Huff_CbCr_AC = mComputeSys->CreateBuffer(STRUCTURED_BUFFER, sizeof(BitString), 256, true, false, Cb_AC_Huffman_Table, false, "mCB_Huff_CbCr_AC");
+//
+//	mCB_DCT_Matrix = mComputeSys->CreateBuffer(STRUCTURED_BUFFER, sizeof(float), 64, true, false, DCT_matrix, false, "mCB_DCT_Matrix");
+//	mCB_DCT_Matrix_Transpose = mComputeSys->CreateBuffer(STRUCTURED_BUFFER, sizeof(float), 64, true, false, DCT_matrix_transpose, false, "mCB_DCT_Matrix_Transpose");
+//
+//	ImageData id;
+//	id.ImageWidth = (float)mImageWidth;
+//	id.ImageHeight = (float)mImageHeight;
+//	id.EntropyBlockSize = mEntropyBlockSize;
+//
+//	id.NumBlocksX = mNumComputationBlocks_Y[0];
+//	id.NumBlocksY = mNumComputationBlocks_Y[1];
+//
+//	mCB_ImageData_Y = mComputeSys->CreateConstantBuffer(sizeof(ImageData), &id, "mCB_ImageData_Y");
+//
+//	id.NumBlocksX = mNumComputationBlocks_CbCr[0];
+//	id.NumBlocksY = mNumComputationBlocks_CbCr[1];
+//	mCB_ImageData_CbCr = mComputeSys->CreateConstantBuffer(sizeof(ImageData), &id, "mCB_ImageData_CbCr");
+//
+//
+//	D3D11_SAMPLER_DESC samplerDesc;
+//	ZeroMemory(&samplerDesc, sizeof(samplerDesc));
+//	samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
+//	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+//	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+//	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+//	samplerDesc.MipLODBias = 0.0f;
+//	samplerDesc.MaxAnisotropy = 1;
+//	samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER; //ALWAYS;
+//	samplerDesc.MinLOD = 0; //-D3D11_FLOAT32_MAX;
+//	samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+//
+//
+//	HRESULT hr = mD3DDevice->CreateSamplerState(&samplerDesc, &mCB_SamplerState_PointClamp);
+//
+//	return S_OK;
+//}
 
 void JpegEncoderGPU::ComputationDimensionsChanged()
 {
@@ -312,38 +316,66 @@ void JpegEncoderGPU::FinalizeData()
 	WriteHex(0xFFD9);
 }
 
-void JpegEncoderGPU::WriteImageData(JEncRGBDataDesc rgbDataDesc)
+// ! Moved to JPEGStage
+//void JpegEncoderGPU::WriteImageData(JEncRGBDataDesc rgbDataDesc)
+//{
+//	/*if (!mCT_RGBA)
+//	{
+//		mCT_RGBA = mComputeSys->CreateTexture(DXGI_FORMAT_R8G8B8A8_UNORM,
+//			rgbDataDesc.Width, rgbDataDesc.Height, rgbDataDesc.RowPitch, rgbDataDesc.Data);
+//	}*/
+//
+//	if (mDoCreateBuffers)
+//	{
+//		CreateBuffers();
+//		mDoCreateBuffers = false;
+//	}
+//
+//	DoQuantization(NULL);
+//
+//	DoEntropyEncode();
+//
+//	FinalizeData();
+//}
+
+// ! Moved to JPEGStage
+//void JpegEncoderGPU::WriteImageData(JEncD3DDataDesc d3dDataDesc)
+//{
+//	if (mDoCreateBuffers)
+//	{
+//		CreateBuffers();
+//		mDoCreateBuffers = false;
+//	}
+//
+//	//DoQuantization(d3dDataDesc.ResourceView);
+//
+//	DoEntropyEncode();
+//
+//	FinalizeData();
+//}
+
+void JpegEncoderGPU::DoEntropyEncode()
 {
-	if (!mCT_RGBA)
+	short prev_DC_Y = 0;
+	short prev_DC_Cb = 0;
+	short prev_DC_Cr = 0;
+
+	int Width = mComputationWidthY;
+	int Height = mComputationHeightY;
+
+	// todo copy result from UAV to RAM
+	//mCB_EntropyResult->CopyToStaging();
+	/*int* pEntropyData = mCB_EntropyResult->Map<int>();
+
+	int iterations = mComputationWidthY / 8 * mComputationHeightY / 8;
+	while (iterations-- > 0)
 	{
-		mCT_RGBA = mComputeSys->CreateTexture(DXGI_FORMAT_R8G8B8A8_UNORM,
-			rgbDataDesc.Width, rgbDataDesc.Height, rgbDataDesc.RowPitch, rgbDataDesc.Data);
+		DoHuffmanEncoding(pEntropyData, prev_DC_Y, Y_DC_Huffman_Table);
+		DoHuffmanEncoding(pEntropyData + mEntropyBlockSize, prev_DC_Cb, Cb_DC_Huffman_Table);
+		DoHuffmanEncoding(pEntropyData + mEntropyBlockSize * 2, prev_DC_Cr, Cb_DC_Huffman_Table);
+
+		pEntropyData += mEntropyBlockSize * 3;
 	}
 
-	if (mDoCreateBuffers)
-	{
-		CreateBuffers();
-		mDoCreateBuffers = false;
-	}
-
-	DoQuantization(NULL);
-
-	DoEntropyEncode();
-
-	FinalizeData();
-}
-
-void JpegEncoderGPU::WriteImageData(JEncD3DDataDesc d3dDataDesc)
-{
-	if (mDoCreateBuffers)
-	{
-		CreateBuffers();
-		mDoCreateBuffers = false;
-	}
-
-	DoQuantization(d3dDataDesc.ResourceView);
-
-	DoEntropyEncode();
-
-	FinalizeData();
+	mCB_EntropyResult->Unmap();*/
 }

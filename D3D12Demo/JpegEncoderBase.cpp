@@ -167,8 +167,6 @@ JEncResult JpegEncoderBase::Encode(JEncRGBDataDesc rgbDataDesc, int quality)
 	JEncResult result;
 	memset(&result, 0, sizeof(result));
 
-	//mSubsampleType = rgbDataDesc.SubsampleType;
-
 	if (!ValidateQuantizationTables(quality))
 		return result;
 
@@ -193,8 +191,6 @@ JEncResult JpegEncoderBase::Encode(JEncD3DDataDesc d3dDataDesc, int quality)
 {
 	JEncResult result;
 	memset(&result, 0, sizeof(result));
-
-	//mSubsampleType = d3dDataDesc.SubsampleType;
 
 	if (!ValidateQuantizationTables(quality))
 		return result;

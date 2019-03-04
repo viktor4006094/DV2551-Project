@@ -3,14 +3,19 @@
 //
 // Copyright (c) Stefan Petersson 2012. All rights reserved.
 //--------------------------------------------------------------------------------------
+// being rewritten fro 444 encoding
+
 #pragma once
 
 #include "JpegEncoderBase.h"
 
 #include "ComputeShader.h"
 
+//todo rename to something more fitting since the GPU stuff is 
+//todo mostly done in JPEGStage
 class JpegEncoderGPU : public JpegEncoderBase
 {
+	friend class JPEGStage;
 protected:
 
 	int mEntropyBlockSize;
@@ -27,47 +32,47 @@ protected:
 	};
 
 	//D3D
-	ID3D11Device*				mD3DDevice;
-	ID3D11DeviceContext*		mD3DDeviceContext;
+	//ID3D11Device*				mD3DDevice;
+	//ID3D11DeviceContext*		mD3DDeviceContext;
 
 	//Constant buffers holding image and compute information
-	ID3D11Buffer*				mCB_ImageData_Y;
-	ID3D11Buffer*				mCB_ImageData_CbCr;
+	//ID3D11Buffer*				mCB_ImageData_Y;
+	//ID3D11Buffer*				mCB_ImageData_CbCr;
 
 	//Compute shaders for each ycbcr component
-	ComputeWrap*				mComputeSys;
-	ComputeShader*				mShader_Y_Component;
-	ComputeShader*				mShader_Cb_Component;
-	ComputeShader*				mShader_Cr_Component;
+	//ComputeWrap*				mComputeSys;
+	//ComputeShader*				mShader_Y_Component;
+	//ComputeShader*				mShader_Cb_Component;
+	//ComputeShader*				mShader_Cr_Component;
 
 	//Output UAV
-	ComputeBuffer*				mCB_EntropyResult;
+	//ComputeBuffer*				mCB_EntropyResult;
 
 	//Huffman tables, structured buffers
-	ComputeBuffer*				mCB_Huff_Y_AC;
-	ComputeBuffer*				mCB_Huff_CbCr_AC;
+	//ComputeBuffer*				mCB_Huff_Y_AC;
+	//ComputeBuffer*				mCB_Huff_CbCr_AC;
 
 	//DCT and Quantization data, one for Y and one for CbCr, structured buffers
-	ComputeBuffer*				mCB_DCT_Matrix;
-	ComputeBuffer*				mCB_DCT_Matrix_Transpose;
-	ComputeBuffer*				mCB_Y_Quantization_Table;
-	ComputeBuffer*				mCB_CbCr_Quantization_Table;
+	//ComputeBuffer*				mCB_DCT_Matrix;
+	//ComputeBuffer*				mCB_DCT_Matrix_Transpose;
+	//ComputeBuffer*				mCB_Y_Quantization_Table;
+	//ComputeBuffer*				mCB_CbCr_Quantization_Table;
 
 	//sampler state used to repeat border pixels
-	ID3D11SamplerState*			mCB_SamplerState_PointClamp;
+	//ID3D11SamplerState*			mCB_SamplerState_PointClamp;
 
 	//Texture used if RGB data sent for encoding
-	ComputeTexture*				mCT_RGBA;
+	//ComputeTexture*				mCT_RGBA;
 
-	TCHAR						mComputeShaderFile[4096];
+	//TCHAR						mComputeShaderFile[4096];
 
 	bool						mDoCreateBuffers;
 
 private:
-	HRESULT CreateBuffers();
-	virtual void ComputationDimensionsChanged();
+	//HRESULT CreateBuffers();
+	void ComputationDimensionsChanged();
 
-	virtual void QuantizationTablesChanged();
+	void QuantizationTablesChanged();
 
 	float Y_Quantization_Table_Float[64];
 	float CbCr_Quantization_Table_Float[64];
@@ -76,10 +81,11 @@ private:
 
 
 public:
-	JpegEncoderGPU(ID3D11Device* d3dDevice, ID3D11DeviceContext* d3dContext);
+	JpegEncoderGPU();
 	virtual ~JpegEncoderGPU();
 
-	virtual bool Init() = 0;
+	// done in JPEGStage
+	//bool Init();
 
 protected:
 	void ReleaseBuffers();
@@ -87,15 +93,16 @@ protected:
 	void ReleaseShaders();
 
 	void DoHuffmanEncoding(int* DU, short& prevDC, BitString* HTDC);
+	
+	//! Moved to JPEGStage
+	void WriteImageData(JEncRGBDataDesc rgbDataDesc) {}
+	void WriteImageData(JEncD3DDataDesc d3dDataDesc) {}
 
-	virtual void WriteImageData(JEncRGBDataDesc rgbDataDesc);
-	virtual void WriteImageData(JEncD3DDataDesc d3dDataDesc);
+	//void DoQuantization(ID3D11ShaderResourceView* pSRV);
 
-	void DoQuantization(ID3D11ShaderResourceView* pSRV);
+	//void Dispatch();
 
-	virtual void Dispatch();
-
-	virtual void DoEntropyEncode() = 0;
+	void DoEntropyEncode();
 
 	void FinalizeData();
 };

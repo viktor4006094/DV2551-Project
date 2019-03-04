@@ -72,6 +72,9 @@
     <ClCompile Include="JEnc.cpp">
       <Filter>Source Files\JPEG Encoder</Filter>
     </ClCompile>
+    <ClCompile Include="JPEGStage.cpp">
+      <Filter>Source Files\GPUStages</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="CS_TestShader.hlsl">
@@ -144,6 +147,9 @@
     </ClInclude>
     <ClInclude Include="ComputeShader.h">
       <Filter>Header Files\JPEG Encoder</Filter>
+    </ClInclude>
+    <ClInclude Include="JPEGStage.hpp">
+      <Filter>Header Files\GPUStages</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

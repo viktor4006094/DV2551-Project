@@ -154,6 +154,7 @@
     <ClCompile Include="JpegEncoderBase.cpp" />
     <ClCompile Include="JpegEncoderGPU.cpp" />
     <ClCompile Include="JpegEncoderGPU_444.cpp" />
+    <ClCompile Include="JPEGStage.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PassThroughStage.cpp" />
     <ClCompile Include="Project.cpp" />
@@ -266,6 +267,7 @@
     <ClInclude Include="JpegEncoderBase.h" />
     <ClInclude Include="JpegEncoderGPU.h" />
     <ClInclude Include="JpegEncoderGPU_444.h" />
+    <ClInclude Include="JPEGStage.hpp" />
     <ClInclude Include="PassThroughStage.hpp" />
     <ClInclude Include="RenderStage.hpp" />
     <ClInclude Include="stdafx.h" />
