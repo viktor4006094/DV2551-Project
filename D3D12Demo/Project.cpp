@@ -449,7 +449,7 @@ void Project::CreateComputeShaderResources()
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gUAVResource));
 
 	D3D12_DESCRIPTOR_HEAP_DESC dhd = {};
-	dhd.NumDescriptors = NUM_SWAP_BUFFERS + 1;
+	dhd.NumDescriptors = NUM_SWAP_BUFFERS + 9;
 	dhd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	dhd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
@@ -476,6 +476,69 @@ void Project::CreateComputeShaderResources()
 		gDevice5->CreateShaderResourceView(gRenderTargets[i], &srvDesc, cdh);
 		cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
+
+#pragma region YCbCrCommittedResources
+	//todo add next set of data
+	resDesc.DepthOrArraySize = 1;
+	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resDesc.Format = DXGI_FORMAT_UNKNOWN;
+	resDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+	resDesc.Width = sizeof(float)*64;
+	resDesc.Height = 1;
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+	resDesc.MipLevels = 1;
+	resDesc.SampleDesc.Count = 1;
+	resDesc.SampleDesc.Quality = 0;
+
+	hr = gDevice5->CreateCommittedResource(
+		&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&gDCTMatrixY));
+	hr = gDevice5->CreateCommittedResource(
+		&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&gDCTMatrixCbCr));
+	hr = gDevice5->CreateCommittedResource(
+		&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&gDCTTransposeY));
+	hr = gDevice5->CreateCommittedResource(
+		&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&gDCTTransposeCbCr));
+	hr = gDevice5->CreateCommittedResource(
+		&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&gQuantizationTableY));
+	hr = gDevice5->CreateCommittedResource(
+		&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&gQuantizationTableCbCr));
+
+	resDesc.Width = sizeof(int) * 256;
+
+	hr = gDevice5->CreateCommittedResource(
+		&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&gAC_HuffmanY));
+	hr = gDevice5->CreateCommittedResource(
+		&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, nullptr, IID_PPV_ARGS(&gAC_HuffmanCbCr));
+#pragma endregion
+
+
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	srvDesc.Format = DXGI_FORMAT_R32_UINT;
+
+	gDevice5->CreateShaderResourceView(gDCTMatrixY, &srvDesc, cdh);
+	cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	gDevice5->CreateShaderResourceView(gDCTMatrixCbCr, &srvDesc, cdh);
+	cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	gDevice5->CreateShaderResourceView(gQuantizationTableY, &srvDesc, cdh);
+	cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	gDevice5->CreateShaderResourceView(gQuantizationTableCbCr, &srvDesc, cdh);
+	cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	gDevice5->CreateShaderResourceView(gDCTTransposeY, &srvDesc, cdh);
+	cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	gDevice5->CreateShaderResourceView(gDCTTransposeCbCr, &srvDesc, cdh);
+	cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	gDevice5->CreateShaderResourceView(gAC_HuffmanY, &srvDesc, cdh);
+	cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	gDevice5->CreateShaderResourceView(gAC_HuffmanCbCr, &srvDesc, cdh);
+	cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
 // todo remove unused stuff

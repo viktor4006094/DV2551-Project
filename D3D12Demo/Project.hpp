@@ -80,6 +80,18 @@ public:
 	ID3D12DescriptorHeap*		gComputeDescriptorHeap = nullptr;
 	ID3D12Resource1*			gUAVResource = nullptr;
 
+	//Resources for the JPEG part
+	ID3D12Resource1*			gDCTMatrixY = nullptr;
+	ID3D12Resource1*			gDCTTransposeY = nullptr;
+	ID3D12Resource1*			gQuantizationTableY = nullptr;
+	ID3D12Resource1*			gAC_HuffmanY = nullptr;
+
+	ID3D12Resource1*			gDCTMatrixCbCr = nullptr;
+	ID3D12Resource1*			gDCTTransposeCbCr = nullptr;
+	ID3D12Resource1*			gQuantizationTableCbCr = nullptr;
+	ID3D12Resource1*			gAC_HuffmanCbCr = nullptr;
+
+
 	D3D12_VIEWPORT				gViewport = {};
 	D3D12_RECT					gScissorRect = {};
 
