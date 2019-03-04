@@ -6,15 +6,15 @@
 #ifndef __jenc_common_h__
 #define __jenc_common_h__
 
-#if defined(_MSC_VER) && (_MSC_VER >= 1020)
+//#if defined(_MSC_VER) && (_MSC_VER >= 1020)
 #pragma once
-#endif
+//#endif
 
-#if defined DLL_EXPORT
-#define DECLDIR __declspec(dllexport)
-#else
-#define DECLDIR __declspec(dllimport)
-#endif
+//#if defined DLL_EXPORT
+//#define DECLDIR __declspec(dllexport)
+//#else
+//#define DECLDIR __declspec(dllimport)
+//#endif
 
 #include <string>
 #include <cmath>

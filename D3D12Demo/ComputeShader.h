@@ -5,9 +5,14 @@
 //--------------------------------------------------------------------------------------
 #pragma once
 
-#include <d3dcommon.h>
-#include <d3d11.h>
+//#include <d3dcommon.h>
+//#include <d3d11.h>
+//#include <d3dcompiler.h>
+
+#include <d3d12.h>
+#include <dxgi1_6.h>//?probably not needed here //Only used for initialization of the device and swap chain.
 #include <d3dcompiler.h>
+
 
 #include <tchar.h>
 
