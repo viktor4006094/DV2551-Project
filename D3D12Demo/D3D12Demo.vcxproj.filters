@@ -13,6 +13,15 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\GPUStages">
+      <UniqueIdentifier>{1e166a98-7b3d-466b-a8e9-df180be436c5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\GPUStages">
+      <UniqueIdentifier>{83bf8ca6-8e16-4c21-9eef-1da9541fc6f9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Common">
+      <UniqueIdentifier>{1d1fc929-8309-4d86-aaa0-a1a8014ba8ea}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -24,14 +33,14 @@
     <ClCompile Include="GameStateHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RenderStage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="ComputeStage.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\GPUStages</Filter>
     </ClCompile>
     <ClCompile Include="PassThroughStage.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\GPUStages</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderStage.cpp">
+      <Filter>Source Files\GPUStages</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -48,26 +57,26 @@
     <ClInclude Include="Project.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="StructsAndEnums.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ConstantsAndGlobals.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="GameStateHandler.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GPUStage.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="RenderStage.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ComputeStage.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\GPUStages</Filter>
     </ClInclude>
     <ClInclude Include="PassThroughStage.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\GPUStages</Filter>
+    </ClInclude>
+    <ClInclude Include="GPUStage.hpp">
+      <Filter>Header Files\GPUStages</Filter>
+    </ClInclude>
+    <ClInclude Include="ComputeStage.hpp">
+      <Filter>Header Files\GPUStages</Filter>
+    </ClInclude>
+    <ClInclude Include="StructsAndEnums.hpp">
+      <Filter>Header Files\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="ConstantsAndGlobals.hpp">
+      <Filter>Header Files\Common</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
