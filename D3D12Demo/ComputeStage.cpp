@@ -13,13 +13,24 @@ ComputeStage::~ComputeStage()
 
 void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 {
+	std::string widthString = std::to_string(SCREEN_WIDTH);
+	LPCSTR widthLPCSTR = widthString.c_str();
+	std::string heightString = std::to_string(SCREEN_HEIGHT);
+	LPCSTR heightLPCSTR = heightString.c_str();
+
 	D3D_SHADER_MACRO computeDefines[] =
 	{
-		"TEXTURE_WIDTH", std::to_string(SCREEN_WIDTH).c_str(),
-		"TEXTURE_HEIGHT", std::to_string(SCREEN_HEIGHT).c_str(),
+		"TEXTURE_WIDTH", widthLPCSTR,
+		"TEXTURE_HEIGHT", heightLPCSTR,
 		NULL, NULL
 	};
 
+	/*D3D_SHADER_MACRO computeDefines[] =
+	{
+		"TEXTURE_WIDTH", "640",
+		"TEXTURE_HEIGHT", "480",
+		NULL, NULL
+	};*/
 
 	////// Shader Compiles //////
 	ID3DBlob* computeBlob;

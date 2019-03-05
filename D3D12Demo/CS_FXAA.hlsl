@@ -247,7 +247,7 @@ void FXAA_main(
 		result = inputTex.SampleLevel(samp, finalUV, 0.0);
 
 		// FOR DEBUGGING. Highlights detected edges
-		//result = float4(1.0, 0.0, 0.0, 0.0);
+		result = float4(1.0, 0.0, 0.0, 0.0);
 	}
 
 	//Flat color
