@@ -13,23 +13,35 @@ ComputeStage::~ComputeStage()
 
 void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 {
+	D3D_SHADER_MACRO computeDefines[] =
+	{
+		"TEXTURE_WIDTH", "640",
+		"TEXTURE_HEIGHT", "480",
+		NULL, NULL
+	};
+
+
 	////// Shader Compiles //////
 	ID3DBlob* computeBlob;
-	D3DCompileFromFile(
-		L"CS_TestShader.hlsl", // filename
-		nullptr,		// optional macros
+	ID3DBlob* errorBlob;
+	HRESULT hr = D3DCompileFromFile(
+		L"CS_FXAA.hlsl", // filename
+		computeDefines,	// optional macros
 		nullptr,		// optional include files
-		"CS_main",		// entry point
+		"FXAA_main",	// entry point
 		"cs_5_0",		// shader model (target)
 		0,				// shader compile options			// here DEBUGGING OPTIONS
 		0,				// effect compile options
 		&computeBlob,	// double pointer to ID3DBlob		
-		nullptr			// pointer for Error Blob messages.
+		&errorBlob			// pointer for Error Blob messages.
 						// how to use the Error blob, see here
 						// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
 	);
 
-
+	if (FAILED(hr))
+	{
+		OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+	}
 
 	////// Pipline State //////
 	D3D12_COMPUTE_PIPELINE_STATE_DESC cpsd = {};
@@ -40,7 +52,13 @@ void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 	cpsd.CS.BytecodeLength = computeBlob->GetBufferSize();
 
 
-	dev->CreateComputePipelineState(&cpsd, IID_PPV_ARGS(&mPipelineState));
+	hr = dev->CreateComputePipelineState(&cpsd, IID_PPV_ARGS(&mPipelineState));
+	if (FAILED(hr))
+	{
+		
+	}
+
+	//todo release pointers
 }
 
 void ComputeStage::Run(int index, Project* p)
@@ -79,7 +97,12 @@ void ComputeStage::Run(int index, Project* p)
 	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*backBufferIndex;
 	directList->SetComputeRootDescriptorTable(2, gdh);
 
-	directList->Dispatch(16, 24, 1);
+
+	static const UINT squaresWide = SCREEN_WIDTH / 40U;
+	static const UINT squaresHigh = SCREEN_HEIGHT / 20U;
+
+	directList->Dispatch(squaresWide, squaresHigh, 1);
+	//directList->Dispatch(16, 24, 1);
 
 	SetResourceTransitionBarrier(directList,
 		p->gUAVResource,

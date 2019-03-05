@@ -400,12 +400,29 @@ void Project::CreateRootSignature()
 	rootParam[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; // Visible to compute
 
 
+	// create a static sampler
+	D3D12_STATIC_SAMPLER_DESC bilinearSampler = {};
+	bilinearSampler.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
+	bilinearSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	bilinearSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	bilinearSampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	bilinearSampler.MipLODBias = 0;
+	bilinearSampler.MaxAnisotropy = 0;
+	bilinearSampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+	bilinearSampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+	bilinearSampler.MinLOD = 0.0f;
+	bilinearSampler.MaxLOD = D3D12_FLOAT32_MAX;
+	bilinearSampler.ShaderRegister = 0;
+	bilinearSampler.RegisterSpace = 0;
+	bilinearSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+
 	D3D12_ROOT_SIGNATURE_DESC rsDesc;
 	rsDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
 	rsDesc.NumParameters = ARRAYSIZE(rootParam);
 	rsDesc.pParameters = rootParam;
-	rsDesc.NumStaticSamplers = 0;
-	rsDesc.pStaticSamplers = nullptr;
+	rsDesc.NumStaticSamplers = 1;
+	rsDesc.pStaticSamplers = &bilinearSampler;
 
 	ID3DBlob* sBlob;
 	ID3DBlob* errorBlob = nullptr;

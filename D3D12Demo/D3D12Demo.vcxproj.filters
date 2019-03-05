@@ -22,6 +22,9 @@
     <Filter Include="Header Files\Common">
       <UniqueIdentifier>{1d1fc929-8309-4d86-aaa0-a1a8014ba8ea}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\HLSL">
+      <UniqueIdentifier>{1912b494-9a96-4896-befc-39b1c6987106}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -44,11 +47,24 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="PixelShader.hlsl" />
-    <FxCompile Include="VertexShader.hlsl" />
-    <FxCompile Include="VS_FullScreenTriangle.hlsl" />
-    <FxCompile Include="CS_TestShader.hlsl" />
-    <FxCompile Include="PS_Passthrough.hlsl" />
+    <FxCompile Include="CS_TestShader.hlsl">
+      <Filter>Source Files\HLSL</Filter>
+    </FxCompile>
+    <FxCompile Include="PixelShader.hlsl">
+      <Filter>Source Files\HLSL</Filter>
+    </FxCompile>
+    <FxCompile Include="PS_Passthrough.hlsl">
+      <Filter>Source Files\HLSL</Filter>
+    </FxCompile>
+    <FxCompile Include="VertexShader.hlsl">
+      <Filter>Source Files\HLSL</Filter>
+    </FxCompile>
+    <FxCompile Include="VS_FullScreenTriangle.hlsl">
+      <Filter>Source Files\HLSL</Filter>
+    </FxCompile>
+    <FxCompile Include="CS_FXAA.hlsl">
+      <Filter>Source Files\HLSL</Filter>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.hpp">
