@@ -15,8 +15,8 @@ void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 {
 	D3D_SHADER_MACRO computeDefines[] =
 	{
-		"TEXTURE_WIDTH", "640",
-		"TEXTURE_HEIGHT", "480",
+		"TEXTURE_WIDTH", std::to_string(SCREEN_WIDTH).c_str(),
+		"TEXTURE_HEIGHT", std::to_string(SCREEN_HEIGHT).c_str(),
 		NULL, NULL
 	};
 
