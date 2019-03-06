@@ -472,6 +472,33 @@ void Project::CreateIntermediateRenderTargets()
 // todo: rename some stuff
 void Project::CreateComputeShaderResources()
 {
+	//// pixel shader outputs/compute shader inputs ////
+	D3D12_RESOURCE_DESC resDesc = {};
+	resDesc.DepthOrArraySize = 1;
+	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+	resDesc.Width = SCREEN_WIDTH;
+	resDesc.Height = SCREEN_HEIGHT;
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	resDesc.MipLevels = 1;
+	resDesc.SampleDesc.Count = 1;
+
+	D3D12_HEAP_PROPERTIES hp = {};
+	hp.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+
+	// Create a commited resource on the GPU for all intermediate render targets used by the geometry pass
+	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
+		HRESULT hr = gDevice5->CreateCommittedResource(
+			&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			nullptr, IID_PPV_ARGS(&gIntermediateRenderTargets[i]));
+	}
+
+
+	//// Compute shader outputs ////
+
 	D3D12_RESOURCE_DESC resDesc = {};
 	resDesc.DepthOrArraySize = 1;
 	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -486,14 +513,24 @@ void Project::CreateComputeShaderResources()
 	D3D12_HEAP_PROPERTIES hp = {};
 	hp.Type = D3D12_HEAP_TYPE_DEFAULT;
 
+	// todo: have one UAV per swap buffer
 	// Initialized as copy source since that's the state it'll be in at the end of every frame
 	HRESULT hr = gDevice5->CreateCommittedResource(
 		&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
 		D3D12_RESOURCE_STATE_COPY_SOURCE,
 		nullptr, IID_PPV_ARGS(&gUAVResource));
 
+
+
+	//// Descriptor heap for the CBV, SRV, and UAV ////
+	//
+	// Layout of the descriptor heap
+	//    slot     descriptor
+	//       0     UAV, output of compute shader
+	//     1-3     SRV, of the output of the pixel shader
+
 	D3D12_DESCRIPTOR_HEAP_DESC dhd = {};
-	dhd.NumDescriptors = NUM_SWAP_BUFFERS + 1;
+	dhd.NumDescriptors = NUM_SWAP_BUFFERS + NUM_SWAP_BUFFERS + 1;
 	dhd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	dhd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
@@ -517,9 +554,32 @@ void Project::CreateComputeShaderResources()
 	srvDesc.Texture2D.MipLevels = 1;
 
 	for (int i = 0; i < NUM_SWAP_BUFFERS; i++) {
-		gDevice5->CreateShaderResourceView(gSwapChainRenderTargets[i], &srvDesc, cdh);
+		//gDevice5->CreateShaderResourceView(gSwapChainRenderTargets[i], &srvDesc, cdh); //old
+		gDevice5->CreateShaderResourceView(gIntermediateRenderTargets[i], &srvDesc, cdh); //new
 		cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
+
+
+	//// Descriptor heap for the intermediate render targets ////
+
+	HRESULT hr = gDevice5->CreateDescriptorHeap(&dhd, IID_PPV_ARGS(&gIntermediateRenderTargetsDescHeap));
+
+	//Create resources for the render targets.
+	gRenderTargetDescriptorSize = gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	D3D12_CPU_DESCRIPTOR_HANDLE cdh = gIntermediateRenderTargetsDescHeap->GetCPUDescriptorHandleForHeapStart();
+
+	//todo: render target view description
+
+
+	//One RTV for each frame.
+	for (UINT n = 0; n < NUM_SWAP_BUFFERS; n++)
+	{
+		//hr = gSwapChain4->GetBuffer(n, IID_PPV_ARGS(&gIntermediateRenderTargets[n]));
+		gDevice5->CreateRenderTargetView(gIntermediateRenderTargets[n], nullptr, cdh);
+		cdh.ptr += gRenderTargetDescriptorSize;
+	}
+
+
 }
 
 // todo remove unused stuff

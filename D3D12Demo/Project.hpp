@@ -65,7 +65,7 @@ public:
 	IDXGISwapChain4*		gSwapChain4 = nullptr;
 
 	// Render targets used by the render stage
-	//ID3D12DescriptorHeap*	gIntermediateRenderTargetsDescHeap = nullptr;
+	ID3D12DescriptorHeap*	gIntermediateRenderTargetsDescHeap = nullptr;
 	ID3D12Resource1*		gIntermediateRenderTargets[NUM_SWAP_BUFFERS] = {};
 	
 	// render targets used as the final backbuffer of the frame
