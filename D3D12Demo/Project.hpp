@@ -96,8 +96,8 @@ public:
 
 	// Constant buffers
 	ID3D12DescriptorHeap*	gDescriptorHeap[NUM_SWAP_BUFFERS] = {};
-	ID3D12Resource1*		gConstantBufferResource[NUM_SWAP_BUFFERS] = {};
-	ID3D12Resource1*		gCBVResource[NUM_SWAP_BUFFERS][TOTAL_TRIS] = {};
+	ID3D12Heap1*			gConstantBufferHeap[NUM_SWAP_BUFFERS] = {};
+	ID3D12Resource1*		gConstantBufferResource[NUM_SWAP_BUFFERS][TOTAL_TRIS] = {};
 
 	// Thread pool
 	ctpl::thread_pool* gThreadPool = nullptr; //1 CPU update, 9 render
