@@ -127,14 +127,14 @@ void RenderStage::Run(int index, Project* p)
 
 	//Indicate that the back buffer will be used as render target.
 	SetResourceTransitionBarrier(directList,
-		p->gRenderTargets[backBufferIndex],
+		p->gSwapChainRenderTargets[backBufferIndex],
 		D3D12_RESOURCE_STATE_PRESENT,		//state before
 		D3D12_RESOURCE_STATE_RENDER_TARGET	//state after
 	);
 
 	//Record commands.
 	//Get the handle for the current render target used as back buffer.
-	D3D12_CPU_DESCRIPTOR_HANDLE cdh = p->gRenderTargetsHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_CPU_DESCRIPTOR_HANDLE cdh = p->gSwapChainRenderTargetsDescHeap->GetCPUDescriptorHandleForHeapStart();
 	cdh.ptr += p->gRenderTargetDescriptorSize * backBufferIndex;
 
 	directList->OMSetRenderTargets(1, &cdh, true, nullptr);

@@ -92,7 +92,7 @@ void ComputeStage::Run(int index, Project* p)
 	directList->SetComputeRootSignature(p->gRootSignature);
 
 	SetResourceTransitionBarrier(directList,
-		p->gRenderTargets[backBufferIndex],
+		p->gSwapChainRenderTargets[backBufferIndex],
 		D3D12_RESOURCE_STATE_RENDER_TARGET,				//state before
 		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE		//state after
 	);
@@ -133,16 +133,16 @@ void ComputeStage::Run(int index, Project* p)
 
 	//Indicate that the back buffer will be used as render target.
 	SetResourceTransitionBarrier(directList,
-		p->gRenderTargets[backBufferIndex],
+		p->gSwapChainRenderTargets[backBufferIndex],
 		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,		//state before
 		D3D12_RESOURCE_STATE_COPY_DEST
 	);
 
-	directList->CopyResource(p->gRenderTargets[backBufferIndex], p->gUAVResource);
+	directList->CopyResource(p->gSwapChainRenderTargets[backBufferIndex], p->gUAVResource);
 
 	//Indicate that the back buffer will be used as render target.
 	SetResourceTransitionBarrier(directList,
-		p->gRenderTargets[backBufferIndex],
+		p->gSwapChainRenderTargets[backBufferIndex],
 		D3D12_RESOURCE_STATE_COPY_DEST,
 		D3D12_RESOURCE_STATE_PRESENT
 	);

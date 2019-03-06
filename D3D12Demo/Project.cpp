@@ -91,12 +91,12 @@ void Project::Shutdown()
 
 	//SafeRelease(&gFence);
 
-	SafeRelease(&gRenderTargetsHeap);
+	SafeRelease(&gSwapChainRenderTargetsDescHeap);
 	for (int i = 0; i < NUM_SWAP_BUFFERS; i++)
 	{
 		SafeRelease(&gDescriptorHeap[i]);
 		SafeRelease(&gConstantBufferResource[i]);
-		SafeRelease(&gRenderTargets[i]);
+		SafeRelease(&gSwapChainRenderTargets[i]);
 	}
 
 	SafeRelease(&gRootSignature);
@@ -253,18 +253,18 @@ void Project::CreateRenderTargets()
 	dhd.NumDescriptors = NUM_SWAP_BUFFERS;
 	dhd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 
-	HRESULT hr = gDevice5->CreateDescriptorHeap(&dhd, IID_PPV_ARGS(&gRenderTargetsHeap));
+	HRESULT hr = gDevice5->CreateDescriptorHeap(&dhd, IID_PPV_ARGS(&gSwapChainRenderTargetsDescHeap));
 
 	//Create resources for the render targets.
 	gRenderTargetDescriptorSize = gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	D3D12_CPU_DESCRIPTOR_HANDLE cdh = gRenderTargetsHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_CPU_DESCRIPTOR_HANDLE cdh = gSwapChainRenderTargetsDescHeap->GetCPUDescriptorHandleForHeapStart();
 
 
 	//One RTV for each frame.
 	for (UINT n = 0; n < NUM_SWAP_BUFFERS; n++)
 	{
-		hr = gSwapChain4->GetBuffer(n, IID_PPV_ARGS(&gRenderTargets[n]));
-		gDevice5->CreateRenderTargetView(gRenderTargets[n], nullptr, cdh);
+		hr = gSwapChain4->GetBuffer(n, IID_PPV_ARGS(&gSwapChainRenderTargets[n]));
+		gDevice5->CreateRenderTargetView(gSwapChainRenderTargets[n], nullptr, cdh);
 		cdh.ptr += gRenderTargetDescriptorSize;
 	}
 }
@@ -442,6 +442,34 @@ void Project::CreateRootSignature()
 		IID_PPV_ARGS(&gRootSignature));
 }
 
+void Project::CreateIntermediateRenderTargets()
+{
+	D3D12_RESOURCE_DESC resDesc = {};
+	resDesc.DepthOrArraySize = 1;
+	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+	resDesc.Width = SCREEN_WIDTH;
+	resDesc.Height = SCREEN_HEIGHT;
+	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	resDesc.MipLevels = 1;
+	resDesc.SampleDesc.Count = 1;
+
+	D3D12_HEAP_PROPERTIES hp = {};
+	hp.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+
+	// Create a commited resource on the GPU for all intermediate render targets used by the geometry pass
+	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
+		HRESULT hr = gDevice5->CreateCommittedResource(
+			&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			nullptr, IID_PPV_ARGS(&gIntermediateRenderTargets[i]));
+	}
+}
+
+// todo: add the intermediate rendertargets to this descriptor heap and move the above function to this one
+// todo: rename some stuff
 void Project::CreateComputeShaderResources()
 {
 	D3D12_RESOURCE_DESC resDesc = {};
@@ -489,7 +517,7 @@ void Project::CreateComputeShaderResources()
 	srvDesc.Texture2D.MipLevels = 1;
 
 	for (int i = 0; i < NUM_SWAP_BUFFERS; i++) {
-		gDevice5->CreateShaderResourceView(gRenderTargets[i], &srvDesc, cdh);
+		gDevice5->CreateShaderResourceView(gSwapChainRenderTargets[i], &srvDesc, cdh);
 		cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
 }

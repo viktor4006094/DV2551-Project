@@ -45,6 +45,7 @@ public:
 
 	void CreateTriangleData();									//8. Create vertexdata
 	void CreateRootSignature();
+	void CreateIntermediateRenderTargets();
 	void CreateComputeShaderResources();
 	void CreateConstantBufferResources();
 	//void CreateMeshes();
@@ -58,16 +59,20 @@ public:
 	CommandQueueAndFence gCommandQueues[3];
 	CommandAllocatorAndList gAllocatorsAndLists[MAX_PREPARED_FRAMES][3];
 
-
 	D3D12DevPtr gDevice5 = nullptr; // ID3D12Device
 
-	//ID3D12CommandAllocator*		gCommandAllocator					= nullptr;
-	IDXGISwapChain4*			gSwapChain4 = nullptr;
+	//ID3D12CommandAllocator*	gCommandAllocator					= nullptr;
+	IDXGISwapChain4*		gSwapChain4 = nullptr;
 
-	ID3D12DescriptorHeap*		gRenderTargetsHeap = nullptr;
-	ID3D12Resource1*			gRenderTargets[NUM_SWAP_BUFFERS] = {};
-	UINT						gRenderTargetDescriptorSize = 0;
-	//UINT						gFrameIndex							= 0;
+	// Render targets used by the render stage
+	//ID3D12DescriptorHeap*	gIntermediateRenderTargetsDescHeap = nullptr;
+	ID3D12Resource1*		gIntermediateRenderTargets[NUM_SWAP_BUFFERS] = {};
+	
+	// render targets used as the final backbuffer of the frame
+	ID3D12DescriptorHeap*	gSwapChainRenderTargetsDescHeap = nullptr;
+	ID3D12Resource1*		gSwapChainRenderTargets[NUM_SWAP_BUFFERS] = {};
+	UINT					gRenderTargetDescriptorSize = 0;
+	//UINT					gFrameIndex							= 0;
 
 	// todo in the render pass write to buffers that aren't in the swapchain
 	/*ID3D12DescriptorHeap*		gComputeInputTargetsHeap = nullptr;
