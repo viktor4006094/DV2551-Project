@@ -7,21 +7,25 @@
 #include <mutex>
 #include <vector>
 
+#define VETTIG_DATOR
 
 // TOTAL_TRIS pretty much decides how many drawcalls in a brute force approach.
-constexpr int TOTAL_TRIS = 4000;
+constexpr int TOTAL_TRIS = 400;
 // this has to do with how the triangles are spread in the screen, not important.
 constexpr int TOTAL_PLACES = 2 * TOTAL_TRIS * 20;
 
 static float gXT[TOTAL_PLACES];
 static float gYT[TOTAL_PLACES];
 
+static const double gMovementSpeed = 0.1;
+
 const int SCREEN_WIDTH = 640; //Width of application.
 const int SCREEN_HEIGHT = 480;	//Height of application.
 
 
+const FLOAT gClearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
 
-const unsigned int MAX_PREPARED_FRAMES = 3; // number of frames that can be queued
+const unsigned int MAX_PREPARED_FRAMES = 2; // number of frames that can be queued
 const unsigned int NUM_SWAP_BUFFERS = 3; //Number of buffers
 
 

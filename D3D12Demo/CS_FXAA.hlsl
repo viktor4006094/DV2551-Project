@@ -45,6 +45,8 @@ float rgb2luma(float3 rgb)
 }
 
 
+
+// todo? change numthreads to a multiple of 32 and add an early exit for threads outside of the texture
 [numthreads(40, 20, 1)]
 void FXAA_main(
 	uint3	dispaThreadID	: SV_DispatchThreadID,	// Global position
@@ -247,8 +249,15 @@ void FXAA_main(
 		result = inputTex.SampleLevel(samp, finalUV, 0.0);
 
 		// FOR DEBUGGING. Highlights detected edges
-		result = float4(1.0, 0.0, 0.0, 0.0);
+		//result = float4(1.0, 0.0, 0.0, 0.0);
+
+
+		// FOR DEBUGGING
 	}
+
+
+	// Turn of FXAA for the left half of the screen
+	//if (orig_uv[0] < 0.5) result = inputTex[screen_pos];
 
 	//Flat color
 	//float4 result = float4(1.0f, 0.0f, 0.0f, 1.0f);

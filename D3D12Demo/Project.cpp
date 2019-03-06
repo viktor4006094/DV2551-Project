@@ -221,16 +221,17 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 	scDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 
 	IDXGISwapChain1* swapChain1 = nullptr;
-	if (SUCCEEDED(factory->CreateSwapChainForHwnd(
+
+	HRESULT hr = factory->CreateSwapChainForHwnd(
 		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue,
 		wndHandle,
 		&scDesc,
 		nullptr,
 		nullptr,
-		&swapChain1)))
-	{
-		if (SUCCEEDED(swapChain1->QueryInterface(IID_PPV_ARGS(&gSwapChain4))))
-		{
+		&swapChain1);
+
+	if (SUCCEEDED(hr)) {
+		if (SUCCEEDED(swapChain1->QueryInterface(IID_PPV_ARGS(&gSwapChain4)))) {
 			gSwapChain4->Release();
 		}
 	}
@@ -400,9 +401,9 @@ void Project::CreateRootSignature()
 	// create a static sampler
 	D3D12_STATIC_SAMPLER_DESC bilinearSampler = {};
 	bilinearSampler.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
-	bilinearSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	bilinearSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
-	bilinearSampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	bilinearSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	bilinearSampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	bilinearSampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 	bilinearSampler.MipLODBias = 0;
 	bilinearSampler.MaxAnisotropy = 0;
 	bilinearSampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
@@ -442,58 +443,38 @@ void Project::CreateRootSignature()
 		IID_PPV_ARGS(&gRootSignature));
 }
 
-void Project::CreateIntermediateRenderTargets()
-{
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.DepthOrArraySize = 1;
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-	resDesc.Width = SCREEN_WIDTH;
-	resDesc.Height = SCREEN_HEIGHT;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	resDesc.MipLevels = 1;
-	resDesc.SampleDesc.Count = 1;
 
-	D3D12_HEAP_PROPERTIES hp = {};
-	hp.Type = D3D12_HEAP_TYPE_DEFAULT;
-
-
-	// Create a commited resource on the GPU for all intermediate render targets used by the geometry pass
-	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
-		HRESULT hr = gDevice5->CreateCommittedResource(
-			&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
-			D3D12_RESOURCE_STATE_RENDER_TARGET,
-			nullptr, IID_PPV_ARGS(&gIntermediateRenderTargets[i]));
-	}
-}
-
-// todo: add the intermediate rendertargets to this descriptor heap and move the above function to this one
 // todo: rename some stuff
 void Project::CreateComputeShaderResources()
 {
-	//// pixel shader outputs/compute shader inputs ////
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.DepthOrArraySize = 1;
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	resDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-	resDesc.Width = SCREEN_WIDTH;
-	resDesc.Height = SCREEN_HEIGHT;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	resDesc.MipLevels = 1;
-	resDesc.SampleDesc.Count = 1;
+	//// pixel shader output render targets/compute shader inputs ////
+	D3D12_RESOURCE_DESC intRTresDesc = {};
+	intRTresDesc.DepthOrArraySize = 1;
+	intRTresDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	intRTresDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	intRTresDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+	intRTresDesc.Width = SCREEN_WIDTH;
+	intRTresDesc.Height = SCREEN_HEIGHT;
+	intRTresDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	intRTresDesc.MipLevels = 1;
+	intRTresDesc.SampleDesc.Count = 1;
 
-	D3D12_HEAP_PROPERTIES hp = {};
-	hp.Type = D3D12_HEAP_TYPE_DEFAULT;
+	D3D12_HEAP_PROPERTIES intRThp = {};
+	intRThp.Type = D3D12_HEAP_TYPE_DEFAULT;
 
+	D3D12_CLEAR_VALUE clv = {};
+	clv.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	clv.Color[0] = gClearColor[0];
+	clv.Color[1] = gClearColor[1];
+	clv.Color[2] = gClearColor[2];
+	clv.Color[3] = gClearColor[3];
 
 	// Create a commited resource on the GPU for all intermediate render targets used by the geometry pass
 	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
 		HRESULT hr = gDevice5->CreateCommittedResource(
-			&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
-			D3D12_RESOURCE_STATE_RENDER_TARGET,
-			nullptr, IID_PPV_ARGS(&gIntermediateRenderTargets[i]));
+			&intRThp, D3D12_HEAP_FLAG_NONE, &intRTresDesc,
+			D3D12_RESOURCE_STATE_COMMON,
+			&clv, IID_PPV_ARGS(&gIntermediateRenderTargets[i]));
 	}
 
 
@@ -530,7 +511,7 @@ void Project::CreateComputeShaderResources()
 	//     1-3     SRV, of the output of the pixel shader
 
 	D3D12_DESCRIPTOR_HEAP_DESC dhd = {};
-	dhd.NumDescriptors = NUM_SWAP_BUFFERS + NUM_SWAP_BUFFERS + 1;
+	dhd.NumDescriptors = NUM_SWAP_BUFFERS + 1;
 	dhd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	dhd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
@@ -561,22 +542,23 @@ void Project::CreateComputeShaderResources()
 
 
 	//// Descriptor heap for the intermediate render targets ////
+	D3D12_DESCRIPTOR_HEAP_DESC RTVdhd = {};
+	RTVdhd.NumDescriptors = NUM_SWAP_BUFFERS;
+	RTVdhd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 
-	HRESULT hr = gDevice5->CreateDescriptorHeap(&dhd, IID_PPV_ARGS(&gIntermediateRenderTargetsDescHeap));
+
+	hr = gDevice5->CreateDescriptorHeap(&RTVdhd, IID_PPV_ARGS(&gIntermediateRenderTargetsDescHeap));
 
 	//Create resources for the render targets.
 	gRenderTargetDescriptorSize = gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	D3D12_CPU_DESCRIPTOR_HANDLE cdh = gIntermediateRenderTargetsDescHeap->GetCPUDescriptorHandleForHeapStart();
-
-	//todo: render target view description
-
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvcdh = gIntermediateRenderTargetsDescHeap->GetCPUDescriptorHandleForHeapStart();
 
 	//One RTV for each frame.
 	for (UINT n = 0; n < NUM_SWAP_BUFFERS; n++)
 	{
 		//hr = gSwapChain4->GetBuffer(n, IID_PPV_ARGS(&gIntermediateRenderTargets[n]));
-		gDevice5->CreateRenderTargetView(gIntermediateRenderTargets[n], nullptr, cdh);
-		cdh.ptr += gRenderTargetDescriptorSize;
+		gDevice5->CreateRenderTargetView(gIntermediateRenderTargets[n], nullptr, rtvcdh);
+		rtvcdh.ptr += gRenderTargetDescriptorSize;
 	}
 
 
@@ -633,6 +615,53 @@ void Project::CreateConstantBufferResources()
 	}
 }
 
+void Project::CopyComputeOutputToBackBuffer(int index)
+{
+	//// Present part ////
+
+	UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
+	//Command list allocators can only be reset when the associated command lists have
+	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
+	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
+	D3D12GraphicsCommandListPtr directList = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
+
+	// todo fence
+
+	directAllocator->Reset();
+	directList->Reset(directAllocator, nullptr);
+
+	SetResourceTransitionBarrier(directList, gUAVResource,
+		D3D12_RESOURCE_STATE_COMMON,
+		D3D12_RESOURCE_STATE_COPY_SOURCE
+	);
+
+	//Indicate that the back buffer will be used as render target.
+	SetResourceTransitionBarrier(directList, gSwapChainRenderTargets[backBufferIndex],
+		D3D12_RESOURCE_STATE_PRESENT,
+		D3D12_RESOURCE_STATE_COPY_DEST
+	);
+
+	directList->CopyResource(gSwapChainRenderTargets[backBufferIndex], gUAVResource);
+
+	//Indicate that the back buffer will be used as render target.
+	SetResourceTransitionBarrier(directList, gSwapChainRenderTargets[backBufferIndex],
+		D3D12_RESOURCE_STATE_COPY_DEST,
+		D3D12_RESOURCE_STATE_PRESENT
+	);
+
+
+	//Close the list to prepare it for execution.
+	directList->Close();
+
+	//wait for current frame to finish its FXAA pass before presenting it
+	gCommandQueues[QUEUE_TYPE_COMPUTE].WaitForGpu();
+
+	//Execute the command list.
+	ID3D12CommandList* listsToExecute2[] = { directList };
+	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
+
+
+}
 
 void Project::Render(int id)
 {
@@ -656,32 +685,17 @@ void Project::Render(int id)
 		// Execute Compute shader and copy the result to the backbuffer
 		GPUStages[1]->Run(index, this);
 
+
+		CopyComputeOutputToBackBuffer(index);
+
+
+		gThreadPool->push([this](int id) {Render(id); });
+
+
 		//Present the frame.
 		DXGI_PRESENT_PARAMETERS pp = {};
 		gSwapChain4->Present1(0, 0, &pp);
 
-		gThreadPool->push([this](int id) {Render(id); });
-
-		//threadIDIndexLock.lock();
-		//// Signal that the execution of this list is done
-		////! SIGNAL MUST HAPPEN AFTER ExecuteCommandLists
-		//{
-		//	const UINT64 fenceVal = gCommandQueues[QUEUE_TYPE_DIRECT].mFenceValue;
-		//	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(fence, fenceVal);
-		//	gCommandQueues[QUEUE_TYPE_DIRECT].mFenceValue++;
-		//	gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mLastFrameWithThisAllocatorFenceValue = fenceVal;
-		//}
-		//threadIDIndexLock.unlock();
-		//gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
-		//Wait for GPU to finish.
-		//NOT BEST PRACTICE, only used as such for simplicity.
-
-
-		//todo wait for previous render call with this render target index to finish the JPEG part
-
-		// create new render thread
-		//gThreadPool.push(Render);
-		//std::thread(Render).detach();
 
 	}
 }

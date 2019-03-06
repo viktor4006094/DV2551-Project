@@ -67,8 +67,8 @@ void GameStateHandler::Update(int id)
 
 			//Update positions of each mesh
 			m.translate = ConstantBuffer{
-				gXT[(int)(float)(meshInd * 10 + dshift) % (TOTAL_PLACES)],
-				gYT[(int)(float)(meshInd * 10 + dshift) % (TOTAL_PLACES)],
+				gXT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
+				gYT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
 				meshInd * (-1.0f / TOTAL_PLACES),
 				0.0f
 			};
@@ -77,7 +77,7 @@ void GameStateHandler::Update(int id)
 		}
 		shift += max((long long)(TOTAL_TRIS / 1000.0), (long long)(TOTAL_TRIS / 100.0));
 		delta = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - startTime).count();
-		dshift += delta * 50.0;
+		dshift += delta * gMovementSpeed;
 		startTime = std::chrono::high_resolution_clock::now();
 
 		//copy updated gamestate to bufferstate

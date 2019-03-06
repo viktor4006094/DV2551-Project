@@ -45,11 +45,6 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 						// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
 	);
 
-	////// Input Layout //////
-	//D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {
-	//	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-	//	{ "COLOR"	, 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
-	//};	
 	D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 	};
@@ -125,36 +120,30 @@ void RenderStage::Run(int index, Project* p)
 	directList->RSSetViewports(1, &p->gViewport);
 	directList->RSSetScissorRects(1, &p->gScissorRect);
 
-	//Indicate that the back buffer will be used as render target.
-	SetResourceTransitionBarrier(directList,
-		p->gSwapChainRenderTargets[backBufferIndex],
-		D3D12_RESOURCE_STATE_PRESENT,		//state before
-		D3D12_RESOURCE_STATE_RENDER_TARGET	//state after
+
+	// Indicate that the intermediate buffer will be used as a render target
+	SetResourceTransitionBarrier(directList, p->gIntermediateRenderTargets[backBufferIndex],
+		D3D12_RESOURCE_STATE_COMMON,
+		D3D12_RESOURCE_STATE_RENDER_TARGET
 	);
 
+
 	//Record commands.
-	//Get the handle for the current render target used as back buffer.
-	D3D12_CPU_DESCRIPTOR_HANDLE cdh = p->gSwapChainRenderTargetsDescHeap->GetCPUDescriptorHandleForHeapStart();
+	//Get the handle for the current render target in the intermediate output buffer.
+	D3D12_CPU_DESCRIPTOR_HANDLE cdh = p->gIntermediateRenderTargetsDescHeap->GetCPUDescriptorHandleForHeapStart();
 	cdh.ptr += p->gRenderTargetDescriptorSize * backBufferIndex;
+
 
 	directList->OMSetRenderTargets(1, &cdh, true, nullptr);
 
-	float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
-	directList->ClearRenderTargetView(cdh, clearColor, 0, nullptr);
+	directList->ClearRenderTargetView(cdh, gClearColor, 0, nullptr);
+
 
 	directList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	directList->IASetVertexBuffers(0, 1, &p->gVertexBufferView);
 
 	//get the current game state
-
 	p->mGameStateHandler.writeNewestGameStateToReadOnlyAtIndex(index);
-	/*gBufferTransferLock.lock();
-	readOnlyState[index] = bufferState;
-	gBufferTransferLock.unlock();*/
-
-	//Update constant buffers and draw triangles
-	//for (int i = 0; i < 100; ++i) {
-
 
 	for (auto &m : p->mGameStateHandler.getReadOnlyStateAtIndex(index)->meshes) {
 		directList->SetGraphicsRoot32BitConstants(0, 4, &m.translate, 0);
@@ -162,14 +151,12 @@ void RenderStage::Run(int index, Project* p)
 
 		directList->DrawInstanced(3, 1, 0, 0);
 	}
-	//}
 
-	//Indicate that the back buffer will now be used to present.
-	//SetResourceTransitionBarrier(directList,
-	//	gRenderTargets[backBufferIndex],
-	//	D3D12_RESOURCE_STATE_RENDER_TARGET,	//state before
-	//	D3D12_RESOURCE_STATE_PRESENT		//state after
-	//);
+	// set state to common since this is used in by the compute queue as well
+	SetResourceTransitionBarrier(directList, p->gIntermediateRenderTargets[backBufferIndex],
+		D3D12_RESOURCE_STATE_RENDER_TARGET,
+		D3D12_RESOURCE_STATE_COMMON
+	);
 
 
 	//Close the list to prepare it for execution.
@@ -178,27 +165,9 @@ void RenderStage::Run(int index, Project* p)
 	//wait for current frame to finish rendering before pushing the next one to GPU
 	p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 
-	// set the just executed command allocator and list to inactive
-	//gAllocatorsAndLists[(index + MAX_THREAD_COUNT - 1) % MAX_THREAD_COUNT][QUEUE_TYPE_DIRECT].isActive = false;
-
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute[] = { directList };
 	p->gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
 
-
-
-	//threadIDIndexLock.lock();
-	//// Signal that the execution of this list is done
-	////! SIGNAL MUST HAPPEN AFTER ExecuteCommandLists
-	//{
-	//	const UINT64 fenceVal = gCommandQueues[QUEUE_TYPE_DIRECT].mFenceValue;
-	//	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(fence, fenceVal);
-	//	gCommandQueues[QUEUE_TYPE_DIRECT].mFenceValue++;
-	//	gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mLastFrameWithThisAllocatorFenceValue = fenceVal;
-	//}
-	//threadIDIndexLock.unlock();
-	//gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
-	//Wait for GPU to finish.
-	//NOT BEST PRACTICE, only used as such for simplicity.
 
 }

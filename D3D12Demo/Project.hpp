@@ -45,13 +45,10 @@ public:
 
 	void CreateTriangleData();									//8. Create vertexdata
 	void CreateRootSignature();
-	void CreateIntermediateRenderTargets();
 	void CreateComputeShaderResources();
 	void CreateConstantBufferResources();
-	//void CreateMeshes();
 
-	//void CountFPS();
-	//void Update(int id);
+	void CopyComputeOutputToBackBuffer(int index);
 	void Render(int id);
 
 
@@ -74,11 +71,6 @@ public:
 	UINT					gRenderTargetDescriptorSize = 0;
 	//UINT					gFrameIndex							= 0;
 
-	// todo in the render pass write to buffers that aren't in the swapchain
-	/*ID3D12DescriptorHeap*		gComputeInputTargetsHeap = nullptr;
-	ID3D12Resource1*			gComputeInputTargets[NUM_SWAP_BUFFERS] = {};
-	UINT						gComputeInputTargetDescriptorSize = 0;*/
-
 
 	//Compute shader UAV and SRV
 	ID3D12Resource1*			gSRVofBackBuffer = nullptr;
@@ -89,11 +81,6 @@ public:
 	D3D12_RECT					gScissorRect = {};
 
 	ID3D12RootSignature*		gRootSignature = nullptr;
-	//ID3D12PipelineState*		gRenderPipeLineState = nullptr;
-	//ID3D12PipelineState*		gComputePipeLineState = nullptr;
-	// only for testing
-	//ID3D12PipelineState*		gPassthroughPipeLineState = nullptr;
-
 
 	ID3D12Resource1*			gVertexBufferResource = nullptr;
 	D3D12_VERTEX_BUFFER_VIEW	gVertexBufferView = {};
@@ -114,18 +101,5 @@ public:
 private:
 
 	GPUStage* GPUStages[2];
-
-#pragma region GameState
-
-
-	
-
-	
-
-
-
-#pragma endregion
-
-
 
 };

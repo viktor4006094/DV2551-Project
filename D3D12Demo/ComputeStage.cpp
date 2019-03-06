@@ -77,86 +77,71 @@ void ComputeStage::Run(int index, Project* p)
 	UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
-	ID3D12CommandAllocator* directAllocator = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
-	D3D12GraphicsCommandListPtr directList = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
+
+	ID3D12CommandAllocator* computeAllocator = p->gAllocatorsAndLists[index][QUEUE_TYPE_COMPUTE].mAllocator;
+	D3D12GraphicsCommandListPtr computeList  = p->gAllocatorsAndLists[index][QUEUE_TYPE_COMPUTE].mCommandList;
 
 
 	//// Compute shader part ////
 
-	p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+	p->gCommandQueues[QUEUE_TYPE_COMPUTE].WaitForGpu();
 
-	directAllocator->Reset();
-	directList->Reset(directAllocator, mPipelineState);
+	computeAllocator->Reset();
+	computeList->Reset(computeAllocator, mPipelineState);
 
 	//Set root signature
-	directList->SetComputeRootSignature(p->gRootSignature);
+	computeList->SetComputeRootSignature(p->gRootSignature);
 
-	SetResourceTransitionBarrier(directList,
-		p->gSwapChainRenderTargets[backBufferIndex],
-		D3D12_RESOURCE_STATE_RENDER_TARGET,				//state before
-		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE		//state after
+	// Set the correct state for the input, will be set to common between queue types
+	SetResourceTransitionBarrier(computeList, p->gIntermediateRenderTargets[backBufferIndex],
+		D3D12_RESOURCE_STATE_COMMON,
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
 	);
 
 
 	ID3D12DescriptorHeap* dheap1[] = { p->gComputeDescriptorHeap };
-	directList->SetDescriptorHeaps(_countof(dheap1), dheap1);
+	computeList->SetDescriptorHeaps(_countof(dheap1), dheap1);
 
 	D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-	directList->SetComputeRootDescriptorTable(3, gdh);
+	computeList->SetComputeRootDescriptorTable(3, gdh);
 
 	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*backBufferIndex;
-	directList->SetComputeRootDescriptorTable(2, gdh);
+	computeList->SetComputeRootDescriptorTable(2, gdh);
 
 
-
-	SetResourceTransitionBarrier(directList,
-		p->gUAVResource,
+	SetResourceTransitionBarrier(computeList, p->gUAVResource,
 		D3D12_RESOURCE_STATE_COPY_SOURCE,
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS		//state before
-		//D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE		//state after
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
 	);
 
 
 	static const UINT squaresWide = SCREEN_WIDTH / 40U;
 	static const UINT squaresHigh = SCREEN_HEIGHT / 20U;
 
-	directList->Dispatch(squaresWide, squaresHigh, 1);
-	//directList->Dispatch(16, 24, 1);
+	computeList->Dispatch(squaresWide, squaresHigh, 1);
 
-	SetResourceTransitionBarrier(directList,
-		p->gUAVResource,
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,		//state before
-		//D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE		//state after
-		D3D12_RESOURCE_STATE_COPY_SOURCE
+	SetResourceTransitionBarrier(computeList, p->gUAVResource,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		D3D12_RESOURCE_STATE_COMMON
 	);
 
-	//Indicate that the back buffer will be used as render target.
-	SetResourceTransitionBarrier(directList,
-		p->gSwapChainRenderTargets[backBufferIndex],
-		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,		//state before
-		D3D12_RESOURCE_STATE_COPY_DEST
+
+	// set state to common since this is used in by the direct queue as well
+	SetResourceTransitionBarrier(computeList, p->gIntermediateRenderTargets[backBufferIndex],
+		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+		D3D12_RESOURCE_STATE_COMMON
 	);
 
-	directList->CopyResource(p->gSwapChainRenderTargets[backBufferIndex], p->gUAVResource);
-
-	//Indicate that the back buffer will be used as render target.
-	SetResourceTransitionBarrier(directList,
-		p->gSwapChainRenderTargets[backBufferIndex],
-		D3D12_RESOURCE_STATE_COPY_DEST,
-		D3D12_RESOURCE_STATE_PRESENT
-	);
 
 	//Close the list to prepare it for execution.
-	directList->Close();
+	computeList->Close();
 
-	//wait for current frame to finish rendering before pushing the next one to GPU
+	//wait for current frame to finish rendering before using it in the compute pass
 	p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 
-	// set the just executed command allocator and list to inactive
-	//gAllocatorsAndLists[(index + MAX_THREAD_COUNT - 1) % MAX_THREAD_COUNT][QUEUE_TYPE_DIRECT].isActive = false;
 
 	//Execute the command list.
-	ID3D12CommandList* listsToExecute2[] = { directList };
-	p->gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
+	ID3D12CommandList* listsToExecute2[] = { computeList };
+	p->gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
 }
