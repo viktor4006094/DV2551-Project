@@ -150,7 +150,6 @@
     <ClCompile Include="ComputeStage.cpp" />
     <ClCompile Include="GameStateHandler.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="PassThroughStage.cpp" />
     <ClCompile Include="Project.cpp" />
     <ClCompile Include="RenderStage.cpp" />
   </ItemGroup>
@@ -254,7 +253,6 @@
     <ClInclude Include="ComputeStage.hpp" />
     <ClInclude Include="GameStateHandler.hpp" />
     <ClInclude Include="GPUStage.hpp" />
-    <ClInclude Include="PassThroughStage.hpp" />
     <ClInclude Include="RenderStage.hpp" />
     <ClInclude Include="StructsAndEnums.hpp" />
     <ClInclude Include="ConstantsAndGlobals.hpp" />

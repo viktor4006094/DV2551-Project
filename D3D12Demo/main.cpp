@@ -76,8 +76,10 @@ HWND InitWindow(HINSTANCE hInstance)//1. Create Window
 	RECT rc = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
 	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, false);
 
+
 	return CreateWindowEx(
-		WS_EX_OVERLAPPEDWINDOW,
+		NULL,
+		//WS_EX_OVERLAPPEDWINDOW, //! Causes the backbuffer to be smaller than specified
 		L"DV2551_Project",
 		L"DV2551 JPEG Project",
 		WS_OVERLAPPEDWINDOW,

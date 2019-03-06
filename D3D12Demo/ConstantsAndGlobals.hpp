@@ -16,8 +16,10 @@ constexpr int TOTAL_PLACES = 2 * TOTAL_TRIS * 20;
 static float gXT[TOTAL_PLACES];
 static float gYT[TOTAL_PLACES];
 
-const unsigned int SCREEN_WIDTH = 640; //Width of application.
-const unsigned int SCREEN_HEIGHT = 480;	//Height of application.
+const int SCREEN_WIDTH = 640; //Width of application.
+const int SCREEN_HEIGHT = 480;	//Height of application.
+
+
 
 const unsigned int MAX_PREPARED_FRAMES = 3; // number of frames that can be queued
 const unsigned int NUM_SWAP_BUFFERS = 3; //Number of buffers

@@ -108,7 +108,7 @@ public:
 	bool isRunning = true;
 private:
 
-	GPUStage* GPUStages[3];
+	GPUStage* GPUStages[2];
 
 #pragma region GameState
 

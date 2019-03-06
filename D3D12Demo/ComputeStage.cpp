@@ -109,6 +109,15 @@ void ComputeStage::Run(int index, Project* p)
 	directList->SetComputeRootDescriptorTable(2, gdh);
 
 
+
+	SetResourceTransitionBarrier(directList,
+		p->gUAVResource,
+		D3D12_RESOURCE_STATE_COPY_SOURCE,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS		//state before
+		//D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE		//state after
+	);
+
+
 	static const UINT squaresWide = SCREEN_WIDTH / 40U;
 	static const UINT squaresHigh = SCREEN_HEIGHT / 20U;
 
@@ -118,19 +127,25 @@ void ComputeStage::Run(int index, Project* p)
 	SetResourceTransitionBarrier(directList,
 		p->gUAVResource,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,		//state before
-		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE		//state after
+		//D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE		//state after
+		D3D12_RESOURCE_STATE_COPY_SOURCE
 	);
-
 
 	//Indicate that the back buffer will be used as render target.
 	SetResourceTransitionBarrier(directList,
 		p->gRenderTargets[backBufferIndex],
 		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,		//state before
-		D3D12_RESOURCE_STATE_RENDER_TARGET		//state after
-		//todo transition to present here when passthrough isn't used
-		//D3D12_RESOURCE_STATE_PRESENT		//state after 
+		D3D12_RESOURCE_STATE_COPY_DEST
 	);
 
+	directList->CopyResource(p->gRenderTargets[backBufferIndex], p->gUAVResource);
+
+	//Indicate that the back buffer will be used as render target.
+	SetResourceTransitionBarrier(directList,
+		p->gRenderTargets[backBufferIndex],
+		D3D12_RESOURCE_STATE_COPY_DEST,
+		D3D12_RESOURCE_STATE_PRESENT
+	);
 
 	//Close the list to prepare it for execution.
 	directList->Close();

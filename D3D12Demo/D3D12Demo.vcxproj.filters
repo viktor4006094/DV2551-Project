@@ -39,9 +39,6 @@
     <ClCompile Include="ComputeStage.cpp">
       <Filter>Source Files\GPUStages</Filter>
     </ClCompile>
-    <ClCompile Include="PassThroughStage.cpp">
-      <Filter>Source Files\GPUStages</Filter>
-    </ClCompile>
     <ClCompile Include="RenderStage.cpp">
       <Filter>Source Files\GPUStages</Filter>
     </ClCompile>
@@ -77,9 +74,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="RenderStage.hpp">
-      <Filter>Header Files\GPUStages</Filter>
-    </ClInclude>
-    <ClInclude Include="PassThroughStage.hpp">
       <Filter>Header Files\GPUStages</Filter>
     </ClInclude>
     <ClInclude Include="GPUStage.hpp">

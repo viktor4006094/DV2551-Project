@@ -1,7 +1,6 @@
 #include "Project.hpp"
 #include "RenderStage.hpp"
 #include "ComputeStage.hpp"
-#include "PassThroughStage.hpp"
 
 #include <chrono>
 #include <ctime>
@@ -28,7 +27,6 @@ void Project::Init(HWND wndHandle)
 
 	GPUStages[0] = new RenderStage();
 	GPUStages[1] = new ComputeStage();
-	GPUStages[2] = new PassThroughStage();
 
 	CreateDirect3DDevice(wndHandle);					//2. Create Device
 	CreateCommandInterfacesAndSwapChain(wndHandle);	//3. Create CommandQueue and SwapChain
@@ -290,7 +288,6 @@ void Project::CreateShadersAndPipelineStates()
 {
 	GPUStages[0]->Init(gDevice5, gRootSignature);
 	GPUStages[1]->Init(gDevice5, gRootSignature);
-	GPUStages[2]->Init(gDevice5, gRootSignature);
 }
 
 
@@ -461,9 +458,11 @@ void Project::CreateComputeShaderResources()
 	D3D12_HEAP_PROPERTIES hp = {};
 	hp.Type = D3D12_HEAP_TYPE_DEFAULT;
 
+	// Initialized as copy source since that's the state it'll be in at the end of every frame
 	HRESULT hr = gDevice5->CreateCommittedResource(
 		&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&gUAVResource));
+		D3D12_RESOURCE_STATE_COPY_SOURCE,
+		nullptr, IID_PPV_ARGS(&gUAVResource));
 
 	D3D12_DESCRIPTOR_HEAP_DESC dhd = {};
 	dhd.NumDescriptors = NUM_SWAP_BUFFERS + 1;
@@ -566,11 +565,8 @@ void Project::Render(int id)
 
 		//todo start new render thread here
 
-		// Execute Compute shader
+		// Execute Compute shader and copy the result to the backbuffer
 		GPUStages[1]->Run(index, this);
-
-		// Passthrough to show on screen
-		GPUStages[2]->Run(index, this);
 
 		//Present the frame.
 		DXGI_PRESENT_PARAMETERS pp = {};
