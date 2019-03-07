@@ -370,15 +370,6 @@ void Project::CreateRootSignature()
 	cdtRanges[0].RegisterSpace		= 0; //register(u0,space0);
 	cdtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	//constant buffers
-	D3D12_DESCRIPTOR_RANGE cbdtRanges[1];
-	cbdtRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	cbdtRanges[0].NumDescriptors = 1; 
-	cbdtRanges[0].BaseShaderRegister = 2; //register b0
-	cbdtRanges[0].RegisterSpace = 0; //register(b0,space0);
-	cbdtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-
 	//create a descriptor table
 	D3D12_ROOT_DESCRIPTOR_TABLE dt;
 	dt.NumDescriptorRanges = ARRAYSIZE(dtRanges);
@@ -389,40 +380,27 @@ void Project::CreateRootSignature()
 	cdt.NumDescriptorRanges = ARRAYSIZE(cdtRanges);
 	cdt.pDescriptorRanges = cdtRanges;
 
-	//create a descriptor table
-	D3D12_ROOT_DESCRIPTOR_TABLE cbdt;
-	cbdt.NumDescriptorRanges = ARRAYSIZE(cbdtRanges);
-	cbdt.pDescriptorRanges = cbdtRanges;
-
 
 
 	//create root parameter
-	D3D12_ROOT_PARAMETER rootParam[5];
+	D3D12_ROOT_PARAMETER rootParam[3];
 
 	// constant buffer
 	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParam[0].Descriptor = { 0, 0 }; // b0, s0
 	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-	
-	// constant color
-	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-	rootParam[1].Constants = { 1, 0, 4 }; // 4 constants in b0 first register space
-	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 
-	// Texture
+	// input texture of compute shader
+	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam[1].DescriptorTable = dt;
+	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; //used by both compute and pixel shader in the test version
+
+	// UAV output of compute shader
 	rootParam[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam[2].DescriptorTable = dt;
-	rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; //used by both compute and pixel shader in the test version
+	rootParam[2].DescriptorTable = cdt;
+	rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; // Visible to compute
 
-	// UAV for compute shader
-	rootParam[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam[3].DescriptorTable = cdt;
-	rootParam[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; // Visible to compute
 
-	//Constant buffers
-	rootParam[4].ParameterType=D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam[4].DescriptorTable = cbdt;
-	rootParam[4].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 	D3D12_ROOT_SIGNATURE_DESC rsDesc;
 	rsDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;

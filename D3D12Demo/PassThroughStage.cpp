@@ -140,7 +140,7 @@ void PassThroughStage::Run(int index, Project* p)
 
 	ID3D12DescriptorHeap* dheap[] = { p->gComputeDescriptorHeap };
 	directList->SetDescriptorHeaps(_countof(dheap), dheap);
-	directList->SetGraphicsRootDescriptorTable(2, p->gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	directList->SetGraphicsRootDescriptorTable(1, p->gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 	directList->DrawInstanced(3, 1, 0, 0);
 
