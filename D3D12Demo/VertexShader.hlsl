@@ -13,6 +13,7 @@ struct VSOut
 cbuffer Translation : register(b0)
 {
 	float4 translate;
+	float4 color;
 };
 
 VSOut VS_main( VSIn input, uint index : SV_VertexID )

@@ -71,22 +71,28 @@ struct Vertex
 	//float r,g,b; // Color
 };
 
-struct ConstantBuffer
+struct float4
 {
-	float values[4];
+	float data[4];
 };
 
-struct TriangleObject
-{
-	//Vertex triangle[3]; // all meshes use the same vertices
-	ConstantBuffer translate;
-	ConstantBuffer color;
+
+struct alignas(256) CONSTANT_BUFFER_DATA {
+	float4 position;
+	float4 color;
 };
 
-struct GameState
-{
-	std::vector<TriangleObject> meshes;
-};
+//struct TriangleObject
+//{
+//	//Vertex triangle[3]; // all meshes use the same vertices
+//	ConstantBuffer translate;
+//	ConstantBuffer color;
+//};
+//
+//struct GameState
+//{
+//	std::vector<TriangleObject> meshes;
+//};
 
 struct CommandQueueAndFence
 {

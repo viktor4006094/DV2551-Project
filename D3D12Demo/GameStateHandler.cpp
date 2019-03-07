@@ -26,13 +26,13 @@ void GameStateHandler::CreateMeshes()
 
 	float fade = 1.0f / TOTAL_TRIS;
 	for (int i = 0; i < TOTAL_TRIS; ++i) {
-		TriangleObject m;
+		//TriangleObject m;
 
 		// initialize meshes with greyscale colors
 		float c = 1.0f - fade * i;
-		m.color = { c, c, c, 1.0 };
+		cbData[i].color = float4{ c, c, c, 1.0 };
 
-		writeState.meshes.push_back(m);
+		//writeState.meshes.push_back(m);
 	}
 
 }
@@ -42,7 +42,7 @@ void GameStateHandler::ShutDown()
 	isRunning = false;
 }
 
-void GameStateHandler::Update(int id)
+void GameStateHandler::Update(int id, UINT* currentFrameIndex)
 {
 	static auto startTime = std::chrono::high_resolution_clock::now();
 	while (isRunning) {
@@ -51,22 +51,23 @@ void GameStateHandler::Update(int id)
 		static double dshift = 0.0;
 		static double delta = 0.0;
 
-
-		for (auto &m : writeState.meshes) {
+		for (int m = 0; m < TOTAL_TRIS; m++) {
+		//for (auto &m : writeState.meshes) {
 
 			//Update color values in constant buffer
 			for (int i = 0; i < 3; i++)
 			{
 				//gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
-				m.color.values[i] += delta / 10000.0f * (i + 1);
-				if (m.color.values[i] > 1)
+				//m.color.values[i] += delta / 10000.0f * (i + 1);
+				cbData[m].color.data[i] += delta / 10000.0f * (i + 1);
+				if (cbData[m].color.data[i] > 1)
 				{
-					m.color.values[i] = 0;
+					cbData[m].color.data[i] = 0;
 				}
 			}
 
 			//Update positions of each mesh
-			m.translate = ConstantBuffer{
+			cbData[m].position = float4{
 				gXT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
 				gYT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
 				meshInd * (-1.0f / TOTAL_PLACES),
@@ -81,20 +82,24 @@ void GameStateHandler::Update(int id)
 		startTime = std::chrono::high_resolution_clock::now();
 
 		//copy updated gamestate to bufferstate
-		gBufferTransferLock.lock();
-		bufferState = writeState;
-		gBufferTransferLock.unlock();
+		//gBufferTransferLock.lock();
+
+		//todo? copy it to the next frames buffer, 
+		memcpy((void*)pMappedCB[*currentFrameIndex], cbData, sizeof(cbData));
+
+		//bufferState = writeState;
+		//gBufferTransferLock.unlock();
 	}
 }
 
-void GameStateHandler::writeNewestGameStateToReadOnlyAtIndex(int index)
-{
-	gBufferTransferLock.lock();
-	readOnlyState[index] = bufferState;
-	gBufferTransferLock.unlock();
-}
-
-GameState* GameStateHandler::getReadOnlyStateAtIndex(int index)
-{
-	return &readOnlyState[index];
-}
+//void GameStateHandler::writeNewestGameStateToReadOnlyAtIndex(int index)
+//{
+//	//gBufferTransferLock.lock();
+//	////readOnlyState[index] = bufferState;
+//	//gBufferTransferLock.unlock();
+//}
+//
+//GameState* GameStateHandler::getReadOnlyStateAtIndex(int index)
+//{
+//	return &readOnlyState[index];
+//}

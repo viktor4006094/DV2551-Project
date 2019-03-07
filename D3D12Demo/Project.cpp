@@ -47,7 +47,7 @@ void Project::Init(HWND wndHandle)
 
 void Project::Start()
 {
-	gThreadPool->push([this](int id) {mGameStateHandler.Update(id); });
+	gThreadPool->push([this](int id) {mGameStateHandler.Update(id, &mLatestBackBufferIndex); });
 	gThreadPool->push([this](int id) {this->Render(id); });
 }
 
@@ -62,6 +62,10 @@ void Project::Shutdown()
 	mGameStateHandler.ShutDown();
 
 	WaitForGpu(QUEUE_TYPE_DIRECT); //todo DON'T
+
+	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
+		gConstantBufferResource[i]->Unmap(0, nullptr);
+	}
 
 	//CloseHandle(gEventHandle);
 	SafeRelease(&gDevice5);
@@ -344,13 +348,13 @@ void Project::CreateTriangleData()
 	gVertexBufferView.SizeInBytes    = sizeof(triangleVertices);
 }
 
-
+// todo remove unused root parameters and tables
 void Project::CreateRootSignature()
 {
 	//define descriptor range(s)
 	D3D12_DESCRIPTOR_RANGE  dtRanges[1];
 	dtRanges[0].RangeType			= D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	dtRanges[0].NumDescriptors		= 1; //only one CB in this example
+	dtRanges[0].NumDescriptors		= 1;
 	dtRanges[0].BaseShaderRegister	= 0; //register b0
 	dtRanges[0].RegisterSpace		= 0; //register(b0,space0);
 	dtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -359,7 +363,7 @@ void Project::CreateRootSignature()
 	D3D12_DESCRIPTOR_RANGE  cdtRanges[1];
 
 	cdtRanges[0].RangeType			= D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-	cdtRanges[0].NumDescriptors		= 1; //only one CB in this example
+	cdtRanges[0].NumDescriptors		= 1; 
 	cdtRanges[0].BaseShaderRegister = 0; //register u0
 	cdtRanges[0].RegisterSpace		= 0; //register(u0,space0);
 	cdtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -374,28 +378,26 @@ void Project::CreateRootSignature()
 	cdt.NumDescriptorRanges = ARRAYSIZE(cdtRanges);
 	cdt.pDescriptorRanges = cdtRanges;
 
+
+
 	//create root parameter
-	D3D12_ROOT_PARAMETER rootParam[4];
+	D3D12_ROOT_PARAMETER rootParam[3];
 
-	// constant translate 
-	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-	rootParam[0].Constants = { 0, 0, 4 }; // 4 constants in b0 first register space
-	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+	// constant buffer
+	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParam[0].Descriptor = { 0, 0 }; // b0, s0
+	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
-	// constant color
-	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-	rootParam[1].Constants = { 1, 0, 4 }; // 4 constants in b0 first register space
-	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+	// input texture of compute shader
+	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+	rootParam[1].DescriptorTable = dt;
+	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; //used by both compute and pixel shader in the test version
 
-	// Texture
+	// UAV output of compute shader
 	rootParam[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam[2].DescriptorTable = dt;
-	rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; //used by both compute and pixel shader in the test version
+	rootParam[2].DescriptorTable = cdt;
+	rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; // Visible to compute
 
-	// UAV for compute shader
-	rootParam[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam[3].DescriptorTable = cdt;
-	rootParam[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; // Visible to compute
 
 
 	// create a static sampler
@@ -436,11 +438,13 @@ void Project::CreateRootSignature()
 	}
 
 
-	hr = gDevice5->CreateRootSignature(
+	if (FAILED(gDevice5->CreateRootSignature(
 		0,
 		sBlob->GetBufferPointer(),
 		sBlob->GetBufferSize(),
-		IID_PPV_ARGS(&gRootSignature));
+		IID_PPV_ARGS(&gRootSignature)))) {
+
+	}
 }
 
 
@@ -570,13 +574,13 @@ void Project::CreateConstantBufferResources()
 	for (int i = 0; i < NUM_SWAP_BUFFERS; i++)
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC heapDescriptorDesc = {};
-		heapDescriptorDesc.NumDescriptors = 1;
+		heapDescriptorDesc.NumDescriptors = TOTAL_TRIS;
 		heapDescriptorDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		heapDescriptorDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		gDevice5->CreateDescriptorHeap(&heapDescriptorDesc, IID_PPV_ARGS(&gDescriptorHeap[i]));
 	}
 
-	UINT cbSizeAligned = (sizeof(ConstantBuffer) + 255) & ~255;	// 256-byte aligned CB.
+	//UINT cbSizeAligned = (sizeof(ConstantBuffer) + 255) & ~255;	// 256-byte aligned CB.
 
 	D3D12_HEAP_PROPERTIES heapProperties = {};
 	heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -587,31 +591,58 @@ void Project::CreateConstantBufferResources()
 
 	D3D12_RESOURCE_DESC resourceDesc = {};
 	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resourceDesc.Width = cbSizeAligned;
+	resourceDesc.Width = sizeof(mGameStateHandler.cbData);
 	resourceDesc.Height = 1;
 	resourceDesc.DepthOrArraySize = 1;
 	resourceDesc.MipLevels = 1;
 	resourceDesc.SampleDesc.Count = 1;
 	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
+	//D3D12_HEAP_DESC hDesc = {};
+	//hDesc.SizeInBytes =sizeof(cbData);
+	//hDesc.Properties = heapProperties;
+	//hDesc.Alignment = 0;
+	//hDesc.Flags = D3D12_HEAP_FLAG_NONE;
+
 	//Create a resource heap, descriptor heap, and pointer to cbv for each frame
 	for (int i = 0; i < NUM_SWAP_BUFFERS; i++)
 	{
-		gDevice5->CreateCommittedResource(
+		if (SUCCEEDED(gDevice5->CreateCommittedResource(
 			&heapProperties,
 			D3D12_HEAP_FLAG_NONE,
 			&resourceDesc,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
-			IID_PPV_ARGS(&gConstantBufferResource[i])
-		);
+			IID_PPV_ARGS(&gConstantBufferResource[i]))))
+		{
+			if (SUCCEEDED(gConstantBufferResource[i]->Map(0, 0, (void**)&mGameStateHandler.pMappedCB[i])))
+			{
+				//memcpy(pMappedCB[index], cbData, sizeof(cbData));
+			}
 
-		gConstantBufferResource[i]->SetName(L"cb heap");
+		}
+		//gDevice5->CreateHeap(&hDesc, IID_PPV_ARGS(&gConstantBufferHeap[i]));
+		
 
-		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-		cbvDesc.BufferLocation = gConstantBufferResource[i]->GetGPUVirtualAddress();
-		cbvDesc.SizeInBytes = cbSizeAligned;
-		gDevice5->CreateConstantBufferView(&cbvDesc, gDescriptorHeap[i]->GetCPUDescriptorHandleForHeapStart());
+		//D3D12_CPU_DESCRIPTOR_HANDLE cdh = gDescriptorHeap[i]->GetCPUDescriptorHandleForHeapStart();
+		//for (int j = 0; j < TOTAL_TRIS; j++) {
+			//gDevice5->CreatePlacedResource(
+			//	gConstantBufferHeap[i],
+			//	j*cbSizeAligned,
+			//	&resourceDesc,
+			//	D3D12_RESOURCE_STATE_GENERIC_READ,
+			//	NULL,
+			//	IID_PPV_ARGS(&gConstantBufferResource[i][j])
+			//);
+
+		//	gConstantBufferResource[i][j]->SetName(L"cb heap");
+		//	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+		//	cbvDesc.BufferLocation = gConstantBufferResource[i][j]->GetGPUVirtualAddress();
+		////todo hlsl aligned data
+		//	cbvDesc.SizeInBytes = cbSizeAligned;
+		//	gDevice5->CreateConstantBufferView(&cbvDesc, cdh);
+		//	cdh.ptr+=gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		//}
 	}
 }
 
@@ -677,6 +708,8 @@ void Project::Render(int id)
 	gThreadIDIndexLock.unlock();
 
 	if (isRunning) {
+		mLatestBackBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
+
 		// Render geometry
 		GPUStages[0]->Run(index, this);
 

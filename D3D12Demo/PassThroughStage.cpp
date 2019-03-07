@@ -1,23 +1,23 @@
-#include "RenderStage.hpp"
+#include "PassThroughStage.hpp"
 #include "Project.hpp"
 
-RenderStage::RenderStage()
+
+PassThroughStage::PassThroughStage()
 {
 
 }
 
-
-RenderStage::~RenderStage()
+PassThroughStage::~PassThroughStage()
 {
 
 }
 
-void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
+void PassThroughStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 {
 	////// Shader Compiles //////
 	ID3DBlob* vertexBlob;
 	D3DCompileFromFile(
-		L"VertexShader.hlsl", // filename
+		L"VS_FullScreenTriangle.hlsl", // filename
 		nullptr,		// optional macros
 		nullptr,		// optional include files
 		"VS_main",		// entry point
@@ -32,7 +32,7 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 
 	ID3DBlob* pixelBlob;
 	D3DCompileFromFile(
-		L"PixelShader.hlsl", // filename
+		L"PS_Passthrough.hlsl", // filename
 		nullptr,		// optional macros
 		nullptr,		// optional include files
 		"PS_main",		// entry point
@@ -45,6 +45,14 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 						// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
 	);
 
+	////// Input Layout //////
+	//D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {
+	//	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	//	{ "COLOR"	, 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+	//};	
+
+
+	// Empty input layout
 	D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 	};
@@ -88,27 +96,18 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 	dev->CreateGraphicsPipelineState(&gpsd, IID_PPV_ARGS(&mPipelineState));
 }
 
-void RenderStage::Run(int index, Project* p)
+void PassThroughStage::Run(int index, Project* p)
 {
-	static size_t lastRenderIterationIndex = 0;
-
 	UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 	ID3D12CommandAllocator* directAllocator = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
 	D3D12GraphicsCommandListPtr	directList = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
 
-	ID3D12Fence1* fence = p->gCommandQueues[QUEUE_TYPE_DIRECT].mFence;
-	HANDLE eventHandle = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mEventHandle;
 
-	////! since WaitForGPU is called just before the commandlist is executed in the previous frame this does 
-	////! not need to be done here since the command allocator is already guaranteed to have finished executing
-	//// wait for previous usage of this command allocator to be done executing before it is reset
-	//UINT64 prevFence = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mLastFrameWithThisAllocatorFenceValue;
-	//if (fence->GetCompletedValue() < prevFence) {
-	//	fence->SetEventOnCompletion(prevFence, eventHandle);
-	//	WaitForSingleObject(eventHandle, INFINITE);
-	//}
+	//// Passthrough ////
+
+	p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 
 	directAllocator->Reset();
 	directList->Reset(directAllocator, mPipelineState);
@@ -120,63 +119,44 @@ void RenderStage::Run(int index, Project* p)
 	directList->RSSetViewports(1, &p->gViewport);
 	directList->RSSetScissorRects(1, &p->gScissorRect);
 
-
-	// Indicate that the intermediate buffer will be used as a render target
-	SetResourceTransitionBarrier(directList, p->gIntermediateRenderTargets[backBufferIndex],
-		D3D12_RESOURCE_STATE_COMMON,
-		D3D12_RESOURCE_STATE_RENDER_TARGET
-	);
-
+	////Indicate that the back buffer will be used as render target.
+	//SetResourceTransitionBarrier(directList,
+	//	gRenderTargets[backBufferIndex],
+	//	D3D12_RESOURCE_STATE_PRESENT,		//state before
+	//	D3D12_RESOURCE_STATE_RENDER_TARGET	//state after
+	//);
 
 	//Record commands.
-	//Get the handle for the current render target in the intermediate output buffer.
-	D3D12_CPU_DESCRIPTOR_HANDLE cdh = p->gIntermediateRenderTargetsDescHeap->GetCPUDescriptorHandleForHeapStart();
+	//Get the handle for the current render target used as back buffer.
+	D3D12_CPU_DESCRIPTOR_HANDLE cdh = p->gRenderTargetsHeap->GetCPUDescriptorHandleForHeapStart();
 	cdh.ptr += p->gRenderTargetDescriptorSize * backBufferIndex;
-
 
 	directList->OMSetRenderTargets(1, &cdh, true, nullptr);
 
-	directList->ClearRenderTargetView(cdh, gClearColor, 0, nullptr);
-
+	float clearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
+	directList->ClearRenderTargetView(cdh, clearColor, 0, nullptr);
 
 	directList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	directList->IASetVertexBuffers(0, 1, &p->gVertexBufferView);
 
-	//get the current game state
+	ID3D12DescriptorHeap* dheap[] = { p->gComputeDescriptorHeap };
+	directList->SetDescriptorHeaps(_countof(dheap), dheap);
+	directList->SetGraphicsRootDescriptorTable(1, p->gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
-	//->mGameStateHandler.writeNewestGameStateToReadOnlyAtIndex(index);
-	/*gBufferTransferLock.lock();
-	readOnlyState[index] = bufferState;
-	gBufferTransferLock.unlock();*/
+	directList->DrawInstanced(3, 1, 0, 0);
 
-	//Update constant buffers and draw triangles
-	//for (int i = 0; i < 100; ++i) {
 
-	D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gRenderTargetsHeap->GetGPUDescriptorHandleForHeapStart();
-
-	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource[backBufferIndex]->GetGPUVirtualAddress();
-
-	for(int i = 0; i < TOTAL_TRIS; ++i) {
-	//for (auto &m : p->mGameStateHandler.getReadOnlyStateAtIndex(index)->meshes) {
-		directList->SetGraphicsRootConstantBufferView(0, gpuVir);
-		//directList->SetComputeRootConstantBufferView(0, gpuVir);
-		gpuVir += sizeof(CONSTANT_BUFFER_DATA);
-
-		/*directList->SetGraphicsRoot32BitConstants(0, 4, &m.translate, 0);
-		directList->SetGraphicsRoot32BitConstants(1, 4, &m.color, 0);*/
-
-		//directList->SetGraphicsRootDescriptorTable(4, gdh);
-		//gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-		directList->DrawInstanced(3, 1, 0, 0);
-	}
-
-	// set state to common since this is used in by the compute queue as well
-	SetResourceTransitionBarrier(directList, p->gIntermediateRenderTargets[backBufferIndex],
-		D3D12_RESOURCE_STATE_RENDER_TARGET,
-		D3D12_RESOURCE_STATE_COMMON
+	//Indicate that the back buffer will now be used to present.
+	SetResourceTransitionBarrier(directList,
+		p->gRenderTargets[backBufferIndex],
+		D3D12_RESOURCE_STATE_RENDER_TARGET,	//state before
+		D3D12_RESOURCE_STATE_PRESENT		//state after
 	);
 
+	SetResourceTransitionBarrier(directList,
+		p->gUAVResource,
+		D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,		//state before
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS		//state after
+	);
 
 	//Close the list to prepare it for execution.
 	directList->Close();
@@ -184,9 +164,10 @@ void RenderStage::Run(int index, Project* p)
 	//wait for current frame to finish rendering before pushing the next one to GPU
 	p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 
+	// set the just executed command allocator and list to inactive
+	//gAllocatorsAndLists[(index + MAX_THREAD_COUNT - 1) % MAX_THREAD_COUNT][QUEUE_TYPE_DIRECT].isActive = false;
+
 	//Execute the command list.
-	ID3D12CommandList* listsToExecute[] = { directList };
-	p->gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
-
-
+	ID3D12CommandList* listsToExecute3[] = { directList };
+	p->gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute3), listsToExecute3);
 }
