@@ -147,7 +147,7 @@ void RenderStage::Run(int index, Project* p)
 
 	//get the current game state
 
-	p->mGameStateHandler.writeNewestGameStateToReadOnlyAtIndex(index);
+	//->mGameStateHandler.writeNewestGameStateToReadOnlyAtIndex(index);
 	/*gBufferTransferLock.lock();
 	readOnlyState[index] = bufferState;
 	gBufferTransferLock.unlock();*/
@@ -157,9 +157,16 @@ void RenderStage::Run(int index, Project* p)
 
 	D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gRenderTargetsHeap->GetGPUDescriptorHandleForHeapStart();
 
-	for (auto &m : p->mGameStateHandler.getReadOnlyStateAtIndex(index)->meshes) {
-		directList->SetGraphicsRoot32BitConstants(0, 4, &m.translate, 0);
-		directList->SetGraphicsRoot32BitConstants(1, 4, &m.color, 0);
+	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource[backBufferIndex]->GetGPUVirtualAddress();
+
+	for(int i = 0; i < TOTAL_TRIS; ++i) {
+	//for (auto &m : p->mGameStateHandler.getReadOnlyStateAtIndex(index)->meshes) {
+		directList->SetGraphicsRootConstantBufferView(0, gpuVir);
+		//directList->SetComputeRootConstantBufferView(0, gpuVir);
+		gpuVir += sizeof(CONSTANT_BUFFER_DATA);
+
+		/*directList->SetGraphicsRoot32BitConstants(0, 4, &m.translate, 0);
+		directList->SetGraphicsRoot32BitConstants(1, 4, &m.color, 0);*/
 
 		//directList->SetGraphicsRootDescriptorTable(4, gdh);
 		//gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);

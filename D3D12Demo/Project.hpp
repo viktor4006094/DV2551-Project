@@ -99,11 +99,13 @@ public:
 	//ID3D12Heap1*			gConstantBufferHeap[NUM_SWAP_BUFFERS] = {};
 	ID3D12Resource1*		gConstantBufferResource[NUM_SWAP_BUFFERS]= {};
 
-	struct alignas(256) CONSTANT_BUFFER_DATA {
+	/*struct alignas(256) CONSTANT_BUFFER_DATA {
 		float position[4];
 		float color[4];
-	}cbData[TOTAL_TRIS], *pMappedCB[3];
+	}cbData[TOTAL_TRIS], *pMappedCB[3];*/
 
+
+	UINT mLatestBackBufferIndex = 0;
 
 	// Thread pool
 	ctpl::thread_pool* gThreadPool = nullptr; //1 CPU update, 9 render

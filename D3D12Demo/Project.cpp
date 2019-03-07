@@ -49,7 +49,7 @@ void Project::Init(HWND wndHandle)
 
 void Project::Start()
 {
-	gThreadPool->push([this](int id) {mGameStateHandler.Update(id); });
+	gThreadPool->push([this](int id) {mGameStateHandler.Update(id, &mLatestBackBufferIndex); });
 	gThreadPool->push([this](int id) {this->Render(id); });
 }
 
@@ -64,6 +64,10 @@ void Project::Shutdown()
 	mGameStateHandler.ShutDown();
 
 	WaitForGpu(QUEUE_TYPE_DIRECT); //todo DON'T
+
+	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
+		gConstantBufferResource[i]->Unmap(0, nullptr);
+	}
 
 	//CloseHandle(gEventHandle);
 	SafeRelease(&gDevice5);
@@ -346,13 +350,13 @@ void Project::CreateTriangleData()
 	gVertexBufferView.SizeInBytes    = sizeof(triangleVertices);
 }
 
-
+// todo remove unused root parameters and tables
 void Project::CreateRootSignature()
 {
 	//define descriptor range(s)
 	D3D12_DESCRIPTOR_RANGE  dtRanges[1];
 	dtRanges[0].RangeType			= D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	dtRanges[0].NumDescriptors		= 1; //only one CB in this example
+	dtRanges[0].NumDescriptors		= 1;
 	dtRanges[0].BaseShaderRegister	= 0; //register b0
 	dtRanges[0].RegisterSpace		= 0; //register(b0,space0);
 	dtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -361,7 +365,7 @@ void Project::CreateRootSignature()
 	D3D12_DESCRIPTOR_RANGE  cdtRanges[1];
 
 	cdtRanges[0].RangeType			= D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-	cdtRanges[0].NumDescriptors		= 1; //only one CB in this example
+	cdtRanges[0].NumDescriptors		= 1; 
 	cdtRanges[0].BaseShaderRegister = 0; //register u0
 	cdtRanges[0].RegisterSpace		= 0; //register(u0,space0);
 	cdtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -369,7 +373,7 @@ void Project::CreateRootSignature()
 	//constant buffers
 	D3D12_DESCRIPTOR_RANGE cbdtRanges[1];
 	cbdtRanges[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-	cbdtRanges[0].NumDescriptors = 1; //only one CB in this example
+	cbdtRanges[0].NumDescriptors = 1; 
 	cbdtRanges[0].BaseShaderRegister = 2; //register b0
 	cbdtRanges[0].RegisterSpace = 0; //register(b0,space0);
 	cbdtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
@@ -390,14 +394,16 @@ void Project::CreateRootSignature()
 	cbdt.NumDescriptorRanges = ARRAYSIZE(cbdtRanges);
 	cbdt.pDescriptorRanges = cbdtRanges;
 
+
+
 	//create root parameter
 	D3D12_ROOT_PARAMETER rootParam[5];
 
-	// constant translate 
-	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-	rootParam[0].Constants = { 0, 0, 4 }; // 4 constants in b0 first register space
-	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-
+	// constant buffer
+	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+	rootParam[0].Descriptor = { 0, 0 }; // b0, s0
+	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+	
 	// constant color
 	rootParam[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
 	rootParam[1].Constants = { 1, 0, 4 }; // 4 constants in b0 first register space
@@ -439,11 +445,13 @@ void Project::CreateRootSignature()
 	}
 
 
-	hr = gDevice5->CreateRootSignature(
+	if (FAILED(gDevice5->CreateRootSignature(
 		0,
 		sBlob->GetBufferPointer(),
 		sBlob->GetBufferSize(),
-		IID_PPV_ARGS(&gRootSignature));
+		IID_PPV_ARGS(&gRootSignature)))) {
+
+	}
 }
 
 void Project::CreateComputeShaderResources()
@@ -519,7 +527,7 @@ void Project::CreateConstantBufferResources()
 
 	D3D12_RESOURCE_DESC resourceDesc = {};
 	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resourceDesc.Width =  sizeof(cbData);
+	resourceDesc.Width = sizeof(mGameStateHandler.cbData);
 	resourceDesc.Height = 1;
 	resourceDesc.DepthOrArraySize = 1;
 	resourceDesc.MipLevels = 1;
@@ -543,7 +551,7 @@ void Project::CreateConstantBufferResources()
 			nullptr,
 			IID_PPV_ARGS(&gConstantBufferResource[i]))))
 		{
-			if (SUCCEEDED(gConstantBufferResource[i]->Map(0, 0, (void**)&pMappedCB[i])))
+			if (SUCCEEDED(gConstantBufferResource[i]->Map(0, 0, (void**)&mGameStateHandler.pMappedCB[i])))
 			{
 				//memcpy(pMappedCB[index], cbData, sizeof(cbData));
 			}
@@ -589,6 +597,8 @@ void Project::Render(int id)
 	gThreadIDIndexLock.unlock();
 
 	if (isRunning) {
+		mLatestBackBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
+
 		// Render geometry
 		GPUStages[0]->Run(index, this);
 

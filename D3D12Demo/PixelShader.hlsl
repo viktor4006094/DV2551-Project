@@ -4,10 +4,11 @@ struct VSOut
 	float4 color	: COLOR;
 };
 
-cbuffer Color : register(b1)
+cbuffer Translation : register(b0)
 {
+	float4 translate;
 	float4 color;
-}
+};
 
 float4 PS_main( VSOut input ) : SV_TARGET0
 {
