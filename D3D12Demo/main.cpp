@@ -15,15 +15,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 {
 	
 	HWND gWndHandle;
-	Project project;
+	Project* project=new Project();
 
 	MSG msg		= {0};
 	gWndHandle	= InitWindow(hInstance);			//1. Create Window
 	if(gWndHandle)
 	{
-		project.Init(gWndHandle);
+		project->Init(gWndHandle);
 
-		project.Start();
+		project->Start();
 
 		ShowWindow(gWndHandle, nCmdShow);
 		while(WM_QUIT != msg.message)
@@ -35,14 +35,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 				
 			}
 		}
-		project.Stop();
+		project->Stop();
 	}
 	
 	// sleep main thread for half a second so that worker threads have time to finish executing
 	std::this_thread::sleep_for(std::chrono::milliseconds(500));
 	
 	//Wait for GPU execution to be done and then release all interfaces.
-	project.Shutdown();
+	project->Shutdown();
 	
 	return (int)msg.wParam;
 }

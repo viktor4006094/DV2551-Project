@@ -508,7 +508,7 @@ void Project::CreateConstantBufferResources()
 		gDevice5->CreateDescriptorHeap(&heapDescriptorDesc, IID_PPV_ARGS(&gDescriptorHeap[i]));
 	}
 
-	UINT cbSizeAligned = (sizeof(ConstantBuffer) + 255) & ~255;	// 256-byte aligned CB.
+	//UINT cbSizeAligned = (sizeof(ConstantBuffer) + 255) & ~255;	// 256-byte aligned CB.
 
 	D3D12_HEAP_PROPERTIES heapProperties = {};
 	heapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
@@ -519,51 +519,58 @@ void Project::CreateConstantBufferResources()
 
 	D3D12_RESOURCE_DESC resourceDesc = {};
 	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resourceDesc.Width =  cbSizeAligned;
+	resourceDesc.Width =  sizeof(cbData);
 	resourceDesc.Height = 1;
 	resourceDesc.DepthOrArraySize = 1;
 	resourceDesc.MipLevels = 1;
 	resourceDesc.SampleDesc.Count = 1;
 	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-	D3D12_HEAP_DESC hDesc = {};
-	hDesc.SizeInBytes = cbSizeAligned * TOTAL_TRIS;
-	hDesc.Properties = heapProperties;
-	hDesc.Alignment = 0;
-	hDesc.Flags = D3D12_HEAP_FLAG_NONE;
+	//D3D12_HEAP_DESC hDesc = {};
+	//hDesc.SizeInBytes =sizeof(cbData);
+	//hDesc.Properties = heapProperties;
+	//hDesc.Alignment = 0;
+	//hDesc.Flags = D3D12_HEAP_FLAG_NONE;
+
 	//Create a resource heap, descriptor heap, and pointer to cbv for each frame
 	for (int i = 0; i < NUM_SWAP_BUFFERS; i++)
 	{
-		//gDevice5->CreateCommittedResource(
-		//	&heapProperties,
-		//	D3D12_HEAP_FLAG_NONE,
-		//	&resourceDesc,
-		//	D3D12_RESOURCE_STATE_GENERIC_READ,
-		//	nullptr,
-		//	IID_PPV_ARGS(&gConstantBufferResource[i])
-		//);
-		gDevice5->CreateHeap(&hDesc, IID_PPV_ARGS(&gConstantBufferHeap[i]));
+		if (SUCCEEDED(gDevice5->CreateCommittedResource(
+			&heapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&gConstantBufferResource[i]))))
+		{
+			if (SUCCEEDED(gConstantBufferResource[i]->Map(0, 0, (void**)&pMappedCB[i])))
+			{
+				//memcpy(pMappedCB[index], cbData, sizeof(cbData));
+			}
 
-
-		D3D12_CPU_DESCRIPTOR_HANDLE cdh = gDescriptorHeap[i]->GetCPUDescriptorHandleForHeapStart();
-		for (int j = 0; j < TOTAL_TRIS; j++) {
-			gDevice5->CreatePlacedResource(
-				gConstantBufferHeap[i],
-				j*cbSizeAligned,
-				&resourceDesc,
-				D3D12_RESOURCE_STATE_GENERIC_READ,
-				NULL,
-				IID_PPV_ARGS(&gConstantBufferResource[i][j])
-			);
-
-			gConstantBufferResource[i][j]->SetName(L"cb heap");
-			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-			cbvDesc.BufferLocation = gConstantBufferResource[i][j]->GetGPUVirtualAddress();
-		//todo hlsl aligned data
-			cbvDesc.SizeInBytes = cbSizeAligned;
-			gDevice5->CreateConstantBufferView(&cbvDesc, cdh);
-			cdh.ptr+=gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		}
+		//gDevice5->CreateHeap(&hDesc, IID_PPV_ARGS(&gConstantBufferHeap[i]));
+		
+
+		//D3D12_CPU_DESCRIPTOR_HANDLE cdh = gDescriptorHeap[i]->GetCPUDescriptorHandleForHeapStart();
+		//for (int j = 0; j < TOTAL_TRIS; j++) {
+			//gDevice5->CreatePlacedResource(
+			//	gConstantBufferHeap[i],
+			//	j*cbSizeAligned,
+			//	&resourceDesc,
+			//	D3D12_RESOURCE_STATE_GENERIC_READ,
+			//	NULL,
+			//	IID_PPV_ARGS(&gConstantBufferResource[i][j])
+			//);
+
+		//	gConstantBufferResource[i][j]->SetName(L"cb heap");
+		//	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+		//	cbvDesc.BufferLocation = gConstantBufferResource[i][j]->GetGPUVirtualAddress();
+		////todo hlsl aligned data
+		//	cbvDesc.SizeInBytes = cbSizeAligned;
+		//	gDevice5->CreateConstantBufferView(&cbvDesc, cdh);
+		//	cdh.ptr+=gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		//}
 	}
 }
 
