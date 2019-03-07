@@ -7,7 +7,7 @@
 #include <mutex>
 #include <vector>
 
-#define VETTIG_DATOR
+//#define VETTIG_DATOR
 
 // TOTAL_TRIS pretty much decides how many drawcalls in a brute force approach.
 constexpr int TOTAL_TRIS = 400;
