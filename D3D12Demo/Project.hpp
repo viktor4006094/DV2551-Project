@@ -75,7 +75,7 @@ public:
 	//Compute shader UAV and SRV
 	ID3D12Resource1*			gSRVofBackBuffer = nullptr;
 	ID3D12DescriptorHeap*		gComputeDescriptorHeap = nullptr;
-	ID3D12Resource1*			gUAVResource = nullptr;
+	ID3D12Resource1*			gUAVResource[NUM_SWAP_BUFFERS] = {};
 
 	D3D12_VIEWPORT				gViewport = {};
 	D3D12_RECT					gScissorRect = {};

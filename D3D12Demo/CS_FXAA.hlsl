@@ -257,7 +257,7 @@ void FXAA_main(
 
 
 	// Turn of FXAA for the left half of the screen
-	//if (orig_uv[0] < 0.5) result = inputTex[screen_pos];
+	if (orig_uv[0] < 0.5) result = inputTex[screen_pos];
 
 	//Flat color
 	//float4 result = float4(1.0f, 0.0f, 0.0f, 1.0f);
