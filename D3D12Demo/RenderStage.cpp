@@ -152,7 +152,7 @@ void RenderStage::Run(int index, Project* p)
 	//Update constant buffers and draw triangles
 	//for (int i = 0; i < 100; ++i) {
 
-	D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gRenderTargetsHeap->GetGPUDescriptorHandleForHeapStart();
+	//D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gRenderTargetsHeap->GetGPUDescriptorHandleForHeapStart();
 
 	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource[backBufferIndex]->GetGPUVirtualAddress();
 
