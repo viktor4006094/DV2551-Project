@@ -696,7 +696,7 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 
 void Project::Render(int id)
 {
-	static size_t lastRenderIterationIndex = 0;
+	static int lastRenderIterationIndex = 0;
 	thread_local int index;
 
 	CountFPS(mWndHandle);

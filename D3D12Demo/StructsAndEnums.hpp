@@ -41,7 +41,6 @@ inline void CountFPS(HWND wndHandle)
 	auto currentTime = std::chrono::high_resolution_clock::now();
 	frames++;
 
-
 	std::chrono::duration<double, std::milli> delta = currentTime - lastTime;
 	if (delta >= std::chrono::duration<double, std::milli>(250)) {
 		lastTime = std::chrono::high_resolution_clock::now();
@@ -82,17 +81,6 @@ struct alignas(256) CONSTANT_BUFFER_DATA {
 	float4 color;
 };
 
-//struct TriangleObject
-//{
-//	//Vertex triangle[3]; // all meshes use the same vertices
-//	ConstantBuffer translate;
-//	ConstantBuffer color;
-//};
-//
-//struct GameState
-//{
-//	std::vector<TriangleObject> meshes;
-//};
 
 struct CommandQueueAndFence
 {

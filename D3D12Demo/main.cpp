@@ -28,7 +28,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 {
 	
 	HWND gWndHandle;
-	Project* project=new Project();
+	Project* project = new Project();
 
 	MSG msg		= {0};
 	gWndHandle	= InitWindow(hInstance);			//1. Create Window
@@ -56,6 +56,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 	//Wait for GPU execution to be done and then release all interfaces.
 	project->Shutdown();
 	
+	delete project;
+
 	return (int)msg.wParam;
 }
 #pragma endregion
@@ -74,12 +76,10 @@ HWND InitWindow(HINSTANCE hInstance)//1. Create Window
 	}
 
 	RECT rc = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
-	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, false);
-
+	AdjustWindowRectEx(&rc, WS_OVERLAPPEDWINDOW, false, WS_EX_OVERLAPPEDWINDOW);
 
 	return CreateWindowEx(
-		NULL,
-		//WS_EX_OVERLAPPEDWINDOW, //! Causes the backbuffer to be smaller than specified
+		WS_EX_OVERLAPPEDWINDOW,
 		L"DV2551_Project",
 		L"DV2551 JPEG Project",
 		WS_OVERLAPPEDWINDOW,

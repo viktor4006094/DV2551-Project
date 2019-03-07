@@ -59,7 +59,7 @@ void GameStateHandler::Update(int id, UINT* currentFrameIndex)
 			{
 				//gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
 				//m.color.values[i] += delta / 10000.0f * (i + 1);
-				cbData[m].color.data[i] += delta / 10000.0f * (i + 1);
+				cbData[m].color.data[i] += static_cast<float>(delta / 10000.0f * (i + 1));
 				if (cbData[m].color.data[i] > 1)
 				{
 					cbData[m].color.data[i] = 0;

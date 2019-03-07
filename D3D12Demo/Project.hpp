@@ -20,7 +20,7 @@
 #pragma comment (lib, "d3dcompiler.lib")
 
 
-class Project
+__declspec(align(256)) class Project
 {
 public:
 	friend class GPUStage;
@@ -50,6 +50,17 @@ public:
 
 	void CopyComputeOutputToBackBuffer(int index);
 	void Render(int id);
+
+	// ensure 256 bit alignment for the constant buffer
+	void* operator new(size_t i)
+	{
+		return _mm_malloc(i, 256);
+	}
+
+	void operator delete(void* p)
+	{
+		_mm_free(p);
+	}
 
 
 
