@@ -23,7 +23,7 @@ void Project::Init(HWND wndHandle)
 	// copy window handle so that we can change the title of the window later
 	mWndHandle = wndHandle;
 
-	gThreadPool = new ctpl::thread_pool(10);
+	gThreadPool = new ctpl::thread_pool(NUM_THREADS);
 
 	GPUStages[0] = new RenderStage();
 	GPUStages[1] = new ComputeStage();
@@ -42,9 +42,15 @@ void Project::Init(HWND wndHandle)
 	//CreateMeshes();										//11. Create meshes (all use same triangle but different constant buffers)
 	CreateComputeShaderResources();
 
+	for (int i = 0; i < NUM_THREADS; ++i) {
+		gIntraThreadFence[i].CreateFenceAndEventHandle(gDevice5);
+	}
+
 	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
 		gIntermediateBufferFence[i].CreateFenceAndEventHandle(gDevice5);
 		gUAVFence[i].CreateFenceAndEventHandle(gDevice5);
+		gIntraFrameFence[i].CreateFenceAndEventHandle(gDevice5);
+		gComputeToCopyFence[i].CreateFenceAndEventHandle(gDevice5);
 	}
 	gBackBufferFence.CreateFenceAndEventHandle(gDevice5);
 
@@ -197,20 +203,20 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 	cqd.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QUEUE_TYPE_DIRECT].mQueue));
 
-	cqd.Type = D3D12_COMMAND_LIST_TYPE_COPY;
-	gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QUEUE_TYPE_COPY].mQueue));
-
 	cqd.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
 	gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue));
+
+	//cqd.Type = D3D12_COMMAND_LIST_TYPE_COPY;
+	//gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QUEUE_TYPE_COPY].mQueue));
 
 
 	//Create command allocator. The command allocator object corresponds
 	//to the underlying allocations in which GPU commands are stored.
 	//Create command list.
 	for (int i = 0; i < MAX_PREPARED_FRAMES; ++i) {
-		gAllocatorsAndLists[i][0].CreateCommandListAndAllocator(QUEUE_TYPE_DIRECT, gDevice5);
-		gAllocatorsAndLists[i][1].CreateCommandListAndAllocator(QUEUE_TYPE_COPY, gDevice5);
-		gAllocatorsAndLists[i][2].CreateCommandListAndAllocator(QUEUE_TYPE_COMPUTE, gDevice5);
+		gAllocatorsAndLists[i][QUEUE_TYPE_DIRECT].CreateCommandListAndAllocator(QUEUE_TYPE_DIRECT, gDevice5);
+		gAllocatorsAndLists[i][QUEUE_TYPE_COMPUTE].CreateCommandListAndAllocator(QUEUE_TYPE_COMPUTE, gDevice5);
+		gAllocatorsAndLists[i][QUEUE_TYPE_DIRECT_COPY_TO_BACKBUFFER].CreateCommandListAndAllocator(QUEUE_TYPE_DIRECT_COPY_TO_BACKBUFFER, gDevice5);
 	}
 
 	IDXGIFactory5*	factory = nullptr;
@@ -254,8 +260,8 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 void Project::CreateFenceAndEventHandle()
 {
 	gCommandQueues[QUEUE_TYPE_DIRECT].CreateFenceAndEventHandle(gDevice5);
-	gCommandQueues[QUEUE_TYPE_COPY].CreateFenceAndEventHandle(gDevice5);
 	gCommandQueues[QUEUE_TYPE_COMPUTE].CreateFenceAndEventHandle(gDevice5);
+	gCommandQueues[QUEUE_TYPE_DIRECT_COPY_TO_BACKBUFFER].CreateFenceAndEventHandle(gDevice5);
 }
 
 void Project::CreateRenderTargets()
@@ -657,15 +663,22 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 {
 	//// Present part ////
 
+
+	//gIntraFrameFence[index].WaitForPrevFence();
+
+	// wait for the last backbuffer to be done presenting
+	//gBackBufferFence.WaitForPrevFence();
+
 	UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
+	//UINT backBufferIndex = index;
+	
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
-	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
-	D3D12GraphicsCommandListPtr directList = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
+	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT_COPY_TO_BACKBUFFER].mAllocator;
+	D3D12GraphicsCommandListPtr directList = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT_COPY_TO_BACKBUFFER].mCommandList;
 
 	
-	// signal that the pixel shader output texture is free to use again
-	gBackBufferFence.WaitForPrevFence();
+	
 
 	directAllocator->Reset();
 	directList->Reset(directAllocator, nullptr);
@@ -694,17 +707,21 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 	directList->Close();
 
 	//wait for current frame to finish its FXAA pass before presenting it
-	gCommandQueues[QUEUE_TYPE_COMPUTE].WaitForGpu();
+	//gCommandQueues[QUEUE_TYPE_COMPUTE].WaitForGpu();
+
 
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute2[] = { directList };
 	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
 
+	//gIntraFrameFence[index].SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
+
+
 	// signal that the pixel shader output texture is free to use again
-	gUAVFence[index].SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
+	//gUAVFence[index].SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
 
 	// signal that this backbuffer is free to use again
-	gBackBufferFence.SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
+	//gBackBufferFence.SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
 }
 
 void Project::Render(int id)
@@ -721,29 +738,65 @@ void Project::Render(int id)
 	gThreadIDIndexLock.unlock();
 
 	if (isRunning) {
+		// used in the cpu update
 		mLatestBackBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 
+		const int ind = index;
 
+		//gIntraFrameFence[ind].WaitForPrevFence();
+
+		///////////////////////////
+
+		// wait
+		gIntermediateBufferFence[index].WaitForPrevFence();
+		gIntermediateBufferFence[index].IncrVal();
+
+
+		gIntraThreadFence[id].WaitForPrevFence();
+		gIntraThreadFence[id].IncrVal();
+		
 
 		// Render geometry
 		GPUStages[0]->Run(index, this);
 
-		//todo start new render thread here
+		//signal
+		gIntraThreadFence[id].SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
 
-		// Execute Compute shader and copy the result to the backbuffer
+		///////////////////////////
+
+		//wait
+		gIntraThreadFence[id].WaitForPrevFence();
+		gIntraThreadFence[id].IncrVal();
+
+
+
 		GPUStages[1]->Run(index, this);
+		
+		//signal
+		gIntraThreadFence[id].SignalFence(gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue);
 
 
-		CopyComputeOutputToBackBuffer(index);
+		///////////////////////////
 
+		//wait
+		gIntraThreadFence[id].WaitForPrevFence();
+		gIntraThreadFence[id].IncrVal();
 
+		gBackBufferFence.WaitForPrevFence();
+		gBackBufferFence.IncrVal();
+		
 		gThreadPool->push([this](int id) {Render(id); });
 
+		CopyComputeOutputToBackBuffer(index);
 
 		//Present the frame.
 		DXGI_PRESENT_PARAMETERS pp = {};
 		gSwapChain4->Present1(0, 0, &pp);
+		//signal
+		gIntraThreadFence[id].SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
 
+		gBackBufferFence.SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
 
+		gIntermediateBufferFence[index].SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
 	}
 }

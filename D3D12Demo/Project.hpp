@@ -104,8 +104,11 @@ public:
 
 	FenceStruct gIntermediateBufferFence[NUM_SWAP_BUFFERS];
 	FenceStruct gUAVFence[NUM_SWAP_BUFFERS];
+	FenceStruct gIntraFrameFence[NUM_SWAP_BUFFERS];
+	FenceStruct gComputeToCopyFence[NUM_SWAP_BUFFERS];
 	FenceStruct gBackBufferFence;
 
+	FenceStruct gIntraThreadFence[NUM_THREADS];
 
 	/*struct alignas(256) CONSTANT_BUFFER_DATA {
 		float position[4];

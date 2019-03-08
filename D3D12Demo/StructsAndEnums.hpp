@@ -56,8 +56,8 @@ inline void CountFPS(HWND wndHandle)
 #pragma region Enums
 enum QueueType : size_t {
 	QUEUE_TYPE_DIRECT = 0,
-	QUEUE_TYPE_COPY = 1,
-	QUEUE_TYPE_COMPUTE = 2
+	QUEUE_TYPE_COMPUTE = 1,
+	QUEUE_TYPE_DIRECT_COPY_TO_BACKBUFFER = 2
 };
 #pragma endregion
 
@@ -87,6 +87,7 @@ struct FenceStruct
 	ID3D12Fence1*		mFence = nullptr;
 	HANDLE				mEventHandle = nullptr;
 	UINT64				mFenceValue = 0;
+	UINT64				mWaitForValue = 0;
 
 	void CreateFenceAndEventHandle(D3D12DevPtr dev)
 	{
@@ -104,13 +105,19 @@ struct FenceStruct
 		mFenceValue++;
 	}
 
+	void IncrVal()
+	{
+		mWaitForValue++;
+	}
+
 	void WaitForPrevFence()
 	{
 		//Wait until command queue is done.
-		if (mFence->GetCompletedValue() < (mFenceValue-1)) {
-			mFence->SetEventOnCompletion((mFenceValue - 1), mEventHandle);
+		if (mFence->GetCompletedValue() < mWaitForValue) {
+			mFence->SetEventOnCompletion(mWaitForValue, mEventHandle);
 			WaitForSingleObject(mEventHandle, INFINITE);
 		}
+		//mWaitForValue++;
 	}
 };
 
@@ -124,7 +131,7 @@ struct CommandQueueAndFence
 
 	void CreateFenceAndEventHandle(D3D12DevPtr dev)
 	{
-		dev->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence));
+		dev->CreateFence(0, D3D12_FENCE_FLAG_SHARED, IID_PPV_ARGS(&mFence));
 		mFenceValue = 1;
 		//Create an event handle to use for GPU synchronization.
 		mEventHandle = CreateEvent(0, false, false, 0);
@@ -169,7 +176,7 @@ struct CommandAllocatorAndList
 	void CreateCommandListAndAllocator(QueueType type, D3D12DevPtr dev)
 	{
 		D3D12_COMMAND_LIST_TYPE listType = D3D12_COMMAND_LIST_TYPE_DIRECT;
-		if (type == QUEUE_TYPE_COPY) { listType = D3D12_COMMAND_LIST_TYPE_COPY; }
+		if (type == QUEUE_TYPE_DIRECT_COPY_TO_BACKBUFFER) { listType = D3D12_COMMAND_LIST_TYPE_DIRECT; }
 		if (type == QUEUE_TYPE_COMPUTE) { listType = D3D12_COMMAND_LIST_TYPE_COMPUTE; }
 
 		dev->CreateCommandAllocator(

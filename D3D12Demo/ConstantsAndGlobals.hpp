@@ -29,6 +29,7 @@ const FLOAT gClearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
 const unsigned int MAX_PREPARED_FRAMES = 3; // number of frames that can be queued
 const unsigned int NUM_SWAP_BUFFERS = 3; //Number of buffers
 
+const unsigned int NUM_THREADS = 10;
 
 static std::mutex gThreadIDIndexLock;
 static std::mutex gBufferTransferLock;
