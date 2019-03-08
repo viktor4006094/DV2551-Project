@@ -78,8 +78,8 @@ void ComputeStage::Run(int index, Project* p)
 	//p->gIntraFrameFence[index].WaitForPrevFence();
 
 
-	//UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
-	UINT backBufferIndex = index;
+	UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
+	//UINT backBufferIndex = index;
 
 
 	//UINT backBufferIndex = index;

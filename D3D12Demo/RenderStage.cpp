@@ -96,8 +96,8 @@ void RenderStage::Run(int index, Project* p)
 	//p->gIntermediateBufferFence[index].WaitForPrevFence();
 	//p->gIntraFrameFence[index].WaitForPrevFence();
 
-	//UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
-	UINT backBufferIndex = index;
+	UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
+	//UINT backBufferIndex = index;
 	
 
 	//UINT backBufferIndex = index;
