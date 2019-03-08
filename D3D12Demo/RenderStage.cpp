@@ -100,6 +100,9 @@ void RenderStage::Run(int index, Project* p)
 	UINT backBufferIndex = index;
 	
 
+	//UINT backBufferIndex = index;
+	
+
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 	ID3D12CommandAllocator* directAllocator = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;

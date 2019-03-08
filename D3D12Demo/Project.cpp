@@ -820,6 +820,8 @@ void Project::Render(int id)
 		//Present the frame.
 		DXGI_PRESENT_PARAMETERS pp = {};
 		gSwapChain4->Present1(0, 0, &pp);
+		//signal
+		gIntraThreadFence[id].SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
 
 		//signal
 		gIntraThreadFence[id].SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);

@@ -82,6 +82,9 @@ void ComputeStage::Run(int index, Project* p)
 	UINT backBufferIndex = index;
 
 
+	//UINT backBufferIndex = index;
+
+
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 
