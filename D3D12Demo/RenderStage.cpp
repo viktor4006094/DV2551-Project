@@ -96,8 +96,8 @@ void RenderStage::Run(int index, Project* p)
 	//p->gIntermediateBufferFence[index].WaitForPrevFence();
 	//p->gIntraFrameFence[index].WaitForPrevFence();
 
-	UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
-	//UINT backBufferIndex = index;
+	//UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
+	UINT backBufferIndex = index;
 	
 
 	//Command list allocators can only be reset when the associated command lists have

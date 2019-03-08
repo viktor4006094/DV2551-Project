@@ -78,8 +78,8 @@ void ComputeStage::Run(int index, Project* p)
 	//p->gIntraFrameFence[index].WaitForPrevFence();
 
 
-	UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
-	//UINT backBufferIndex = index;
+	//UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
+	UINT backBufferIndex = index;
 
 
 	//Command list allocators can only be reset when the associated command lists have
@@ -119,7 +119,7 @@ void ComputeStage::Run(int index, Project* p)
 
 
 	SetResourceTransitionBarrier(computeList, p->gUAVResource[backBufferIndex],
-		D3D12_RESOURCE_STATE_COPY_SOURCE,
+		D3D12_RESOURCE_STATE_COMMON,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
 	);
 

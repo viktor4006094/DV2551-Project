@@ -107,7 +107,9 @@ struct FenceStruct
 
 	void IncrVal()
 	{
+		gThreadIDIndexLock.lock();
 		mWaitForValue++;
+		gThreadIDIndexLock.unlock();
 	}
 
 	void WaitForPrevFence()

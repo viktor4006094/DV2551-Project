@@ -102,7 +102,7 @@ public:
 	//ID3D12Heap1*			gConstantBufferHeap[NUM_SWAP_BUFFERS] = {};
 	ID3D12Resource1*		gConstantBufferResource[NUM_SWAP_BUFFERS]= {};
 
-	FenceStruct gIntermediateBufferFence[NUM_SWAP_BUFFERS];
+	FenceStruct gPerFrameIndexFence[NUM_SWAP_BUFFERS];
 	FenceStruct gUAVFence[NUM_SWAP_BUFFERS];
 	FenceStruct gIntraFrameFence[NUM_SWAP_BUFFERS];
 	FenceStruct gComputeToCopyFence[NUM_SWAP_BUFFERS];

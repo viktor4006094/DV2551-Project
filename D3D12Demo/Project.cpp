@@ -47,7 +47,7 @@ void Project::Init(HWND wndHandle)
 	}
 
 	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
-		gIntermediateBufferFence[i].CreateFenceAndEventHandle(gDevice5);
+		gPerFrameIndexFence[i].CreateFenceAndEventHandle(gDevice5);
 		gUAVFence[i].CreateFenceAndEventHandle(gDevice5);
 		gIntraFrameFence[i].CreateFenceAndEventHandle(gDevice5);
 		gComputeToCopyFence[i].CreateFenceAndEventHandle(gDevice5);
@@ -206,6 +206,11 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 	cqd.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
 	gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue));
 
+#ifdef _DEBUG
+	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->SetName(L"Direct Queue");
+	gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->SetName(L"Compute Queue");
+#endif
+
 	//cqd.Type = D3D12_COMMAND_LIST_TYPE_COPY;
 	//gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QUEUE_TYPE_COPY].mQueue));
 
@@ -284,6 +289,10 @@ void Project::CreateRenderTargets()
 		hr = gSwapChain4->GetBuffer(n, IID_PPV_ARGS(&gSwapChainRenderTargets[n]));
 		gDevice5->CreateRenderTargetView(gSwapChainRenderTargets[n], nullptr, cdh);
 		cdh.ptr += gRenderTargetDescriptorSize;
+
+#ifdef _DEBUG
+		gSwapChainRenderTargets[n]->SetName(L"gSwapChainRenderTargets");
+#endif
 	}
 }
 
@@ -492,6 +501,10 @@ void Project::CreateComputeShaderResources()
 			&intRThp, D3D12_HEAP_FLAG_NONE, &intRTresDesc,
 			D3D12_RESOURCE_STATE_COMMON,
 			&clv, IID_PPV_ARGS(&gIntermediateRenderTargets[i]));
+
+#ifdef _DEBUG
+		gIntermediateRenderTargets[i]->SetName(L"gIntermediateRenderTargets");
+#endif
 	}
 
 
@@ -517,6 +530,9 @@ void Project::CreateComputeShaderResources()
 			&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
 			D3D12_RESOURCE_STATE_COPY_SOURCE,
 			nullptr, IID_PPV_ARGS(&gUAVResource[i]));
+#ifdef _DEBUG
+		gUAVResource[i]->SetName(L"gUAVResource");
+#endif
 	}
 
 
@@ -672,6 +688,10 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 	UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 	//UINT backBufferIndex = index;
 	
+	if (index != backBufferIndex) {
+		int t = 3;
+	}
+
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT_COPY_TO_BACKBUFFER].mAllocator;
@@ -683,7 +703,7 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 	directAllocator->Reset();
 	directList->Reset(directAllocator, nullptr);
 
-	SetResourceTransitionBarrier(directList, gUAVResource[backBufferIndex],
+	SetResourceTransitionBarrier(directList, gUAVResource[index],
 		D3D12_RESOURCE_STATE_COMMON,
 		D3D12_RESOURCE_STATE_COPY_SOURCE
 	);
@@ -694,7 +714,7 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 		D3D12_RESOURCE_STATE_COPY_DEST
 	);
 
-	directList->CopyResource(gSwapChainRenderTargets[backBufferIndex], gUAVResource[backBufferIndex]);
+	directList->CopyResource(gSwapChainRenderTargets[backBufferIndex], gUAVResource[index]);
 
 	//Indicate that the back buffer will be used as render target.
 	SetResourceTransitionBarrier(directList, gSwapChainRenderTargets[backBufferIndex],
@@ -702,6 +722,10 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 		D3D12_RESOURCE_STATE_PRESENT
 	);
 
+	SetResourceTransitionBarrier(directList, gUAVResource[index],
+		D3D12_RESOURCE_STATE_COPY_SOURCE,
+		D3D12_RESOURCE_STATE_COMMON
+	);
 
 	//Close the list to prepare it for execution.
 	directList->Close();
@@ -748,8 +772,9 @@ void Project::Render(int id)
 		///////////////////////////
 
 		// wait
-		gIntermediateBufferFence[index].WaitForPrevFence();
-		gIntermediateBufferFence[index].IncrVal();
+		gPerFrameIndexFence[index].WaitForPrevFence();
+		gPerFrameIndexFence[index].IncrVal();
+		gPerFrameIndexFence[index].IncrVal();
 
 
 		gIntraThreadFence[id].WaitForPrevFence();
@@ -774,6 +799,7 @@ void Project::Render(int id)
 		
 		//signal
 		gIntraThreadFence[id].SignalFence(gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue);
+		gPerFrameIndexFence[index].SignalFence(gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue);
 
 
 		///////////////////////////
@@ -785,6 +811,7 @@ void Project::Render(int id)
 		gBackBufferFence.WaitForPrevFence();
 		gBackBufferFence.IncrVal();
 		
+		// Start new render thread once the first part of the first stage of the frame has finished rendering
 		gThreadPool->push([this](int id) {Render(id); });
 
 		CopyComputeOutputToBackBuffer(index);
@@ -799,6 +826,6 @@ void Project::Render(int id)
 
 		gBackBufferFence.SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
 
-		gIntermediateBufferFence[index].SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
+		gPerFrameIndexFence[index].SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
 	}
 }
