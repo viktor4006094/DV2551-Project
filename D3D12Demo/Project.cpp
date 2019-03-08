@@ -42,6 +42,13 @@ void Project::Init(HWND wndHandle)
 	//CreateMeshes();										//11. Create meshes (all use same triangle but different constant buffers)
 	CreateComputeShaderResources();
 
+	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
+		gIntermediateBufferFence[i].CreateFenceAndEventHandle(gDevice5);
+		gUAVFence[i].CreateFenceAndEventHandle(gDevice5);
+	}
+	gBackBufferFence.CreateFenceAndEventHandle(gDevice5);
+
+
 	WaitForGpu(QUEUE_TYPE_DIRECT);
 }
 
@@ -656,7 +663,9 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
 	D3D12GraphicsCommandListPtr directList = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
 
-	// todo fence
+	
+	// signal that the pixel shader output texture is free to use again
+	gBackBufferFence.WaitForPrevFence();
 
 	directAllocator->Reset();
 	directList->Reset(directAllocator, nullptr);
@@ -691,7 +700,11 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 	ID3D12CommandList* listsToExecute2[] = { directList };
 	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
 
+	// signal that the pixel shader output texture is free to use again
+	gUAVFence[index].SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
 
+	// signal that this backbuffer is free to use again
+	gBackBufferFence.SignalFence(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
 }
 
 void Project::Render(int id)
@@ -709,6 +722,8 @@ void Project::Render(int id)
 
 	if (isRunning) {
 		mLatestBackBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
+
+
 
 		// Render geometry
 		GPUStages[0]->Run(index, this);
