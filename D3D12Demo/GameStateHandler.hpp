@@ -19,7 +19,7 @@ public:
 
 	bool isRunning = true;
 
-
+	DirectX::FXMMATRIX viewProjection = DirectX::XMMatrixLookAtLH({ 0, 0, 0 }, { 0, 0, 1 }, {0,1,0});
 	CONSTANT_BUFFER_DATA cbData[TOTAL_TRIS];
 	CONSTANT_BUFFER_DATA *pMappedCB[NUM_SWAP_BUFFERS];
 private:

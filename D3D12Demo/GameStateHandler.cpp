@@ -32,6 +32,8 @@ void GameStateHandler::CreateMeshes()
 		float c = 1.0f - fade * i;
 		cbData[i].color = float4{ c, c, c, 1.0 };
 
+		
+		cbData[i].world = DirectX::XMFLOAT4X4{ 0,0,0,0,0,0,0,0,0,0,0,0,i % 100,0,i / 100,1 };//DirectX::XMMatrixTranslation((i % 100), 0, (i / 40));
 		//writeState.meshes.push_back(m);
 	}
 
@@ -67,12 +69,12 @@ void GameStateHandler::Update(int id, UINT* currentFrameIndex)
 			}
 
 			//Update positions of each mesh
-			cbData[m].position = float4{
-				gXT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
-				gYT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
-				meshInd * (-1.0f / TOTAL_PLACES),
-				0.0f
-			};
+			//cbData[m].position = float4{
+			//	gXT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
+			//	gYT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
+			//	meshInd * (-1.0f / TOTAL_PLACES),
+			//	0.0f
+			//};
 
 			meshInd++;
 		}

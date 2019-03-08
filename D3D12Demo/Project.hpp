@@ -8,6 +8,7 @@
 #include <dxgi1_6.h> //Only used for initialization of the device and swap chain.
 #include <d3dcompiler.h>
 
+
 #include <vector>
 
 #include "..\extLib\ctpl_stl.h"

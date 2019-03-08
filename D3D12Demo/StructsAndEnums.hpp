@@ -2,7 +2,8 @@
 
 #include <d3d12.h>
 #include "ConstantsAndGlobals.hpp"
-
+#include <DirectXMath.h>
+#include <d3dtypes.h>
 #include <string>
 
 template<class Interface>
@@ -77,7 +78,8 @@ struct float4
 
 
 struct alignas(256) CONSTANT_BUFFER_DATA {
-	float4 position;
+	DirectX::XMFLOAT4X4 world;
+	//float4 position;
 	float4 color;
 };
 

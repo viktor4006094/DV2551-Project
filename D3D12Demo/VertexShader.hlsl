@@ -12,6 +12,8 @@ struct VSOut
 
 cbuffer Translation : register(b0)
 {
+	float4x4 worldMat;
+	float4x4 viewprojMat;
 	float4 translate;
 	float4 color;
 };
@@ -32,7 +34,9 @@ VSOut VS_main( VSIn input, uint index : SV_VertexID )
 
 	output.color = test;
 
-	output.pos = input.pos +translate;
-	output.pos.z += 0.55; // move them backwards so that they're in front of the camera
+	output.pos = { 0,0,0,1 }*worldMat*viewprojMat;
+
+	//output.pos = input.pos +translate;
+	//output.pos.z += 0.55; // move them backwards so that they're in front of the camera
 	return output;
 }
