@@ -498,38 +498,38 @@ void Project::CreateComputeShaderResources()
 	D3D12_HEAP_PROPERTIES hp = {};
 	hp.Type = D3D12_HEAP_TYPE_DEFAULT;
 
-	// todo: have one UAV per swap buffer
 	// Initialized as copy source since that's the state it'll be in at the end of every frame
-	HRESULT hr = gDevice5->CreateCommittedResource(
-		&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
-		D3D12_RESOURCE_STATE_COPY_SOURCE,
-		nullptr, IID_PPV_ARGS(&gUAVResource));
-
+	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
+		HRESULT hr = gDevice5->CreateCommittedResource(
+			&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
+			D3D12_RESOURCE_STATE_COPY_SOURCE,
+			nullptr, IID_PPV_ARGS(&gUAVResource[i]));
+	}
 
 
 	//// Descriptor heap for the CBV, SRV, and UAV ////
 	//
 	// Layout of the descriptor heap
 	//    slot     descriptor
-	//       0     UAV, output of compute shader
-	//     1-3     SRV, of the output of the pixel shader
+	//     0-2     UAV, output of compute shader
+	//     3-5     SRV, of the output of the pixel shader
 
 	D3D12_DESCRIPTOR_HEAP_DESC dhd = {};
-	dhd.NumDescriptors = NUM_SWAP_BUFFERS + 1;
+	dhd.NumDescriptors = NUM_SWAP_BUFFERS + NUM_SWAP_BUFFERS;
 	dhd.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	dhd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 
-	hr = gDevice5->CreateDescriptorHeap(&dhd, IID_PPV_ARGS(&gComputeDescriptorHeap));
+	HRESULT hr = gDevice5->CreateDescriptorHeap(&dhd, IID_PPV_ARGS(&gComputeDescriptorHeap));
 
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 	uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 
 	D3D12_CPU_DESCRIPTOR_HANDLE cdh = gComputeDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 
-	gDevice5->CreateUnorderedAccessView(gUAVResource, nullptr, &uavDesc, cdh);
-
-	cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
+	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
+		gDevice5->CreateUnorderedAccessView(gUAVResource[i], nullptr, &uavDesc, cdh);
+		cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	}
 
 	// Create SRVs for all the buffers in the swap chain so that they can be read from by the compute shader
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
@@ -661,7 +661,7 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 	directAllocator->Reset();
 	directList->Reset(directAllocator, nullptr);
 
-	SetResourceTransitionBarrier(directList, gUAVResource,
+	SetResourceTransitionBarrier(directList, gUAVResource[backBufferIndex],
 		D3D12_RESOURCE_STATE_COMMON,
 		D3D12_RESOURCE_STATE_COPY_SOURCE
 	);
@@ -672,7 +672,7 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 		D3D12_RESOURCE_STATE_COPY_DEST
 	);
 
-	directList->CopyResource(gSwapChainRenderTargets[backBufferIndex], gUAVResource);
+	directList->CopyResource(gSwapChainRenderTargets[backBufferIndex], gUAVResource[backBufferIndex]);
 
 	//Indicate that the back buffer will be used as render target.
 	SetResourceTransitionBarrier(directList, gSwapChainRenderTargets[backBufferIndex],
