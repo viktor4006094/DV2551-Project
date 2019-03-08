@@ -104,7 +104,7 @@ void ComputeStage::Run(int index, Project* p)
 
 	D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
 	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*backBufferIndex;
-	computeList->SetComputeRootDescriptorTable(3, gdh);
+	computeList->SetComputeRootDescriptorTable(2, gdh);
 	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*(NUM_SWAP_BUFFERS-backBufferIndex);
 	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*backBufferIndex;
 	computeList->SetComputeRootDescriptorTable(1, gdh);
