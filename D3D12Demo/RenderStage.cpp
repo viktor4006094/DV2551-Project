@@ -92,7 +92,14 @@ void RenderStage::Run(int index, Project* p)
 {
 	static size_t lastRenderIterationIndex = 0;
 
+	// wait for the previous usage of this pixel shader output texture to be free to use
+	//p->gIntermediateBufferFence[index].WaitForPrevFence();
+	//p->gIntraFrameFence[index].WaitForPrevFence();
+
 	UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
+	//UINT backBufferIndex = index;
+	
+
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 	ID3D12CommandAllocator* directAllocator = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
@@ -110,8 +117,7 @@ void RenderStage::Run(int index, Project* p)
 	//	WaitForSingleObject(eventHandle, INFINITE);
 	//}
 
-	// wait for the previous usage of this pixel shader output texture to be free to use
-	p->gIntermediateBufferFence[index].WaitForPrevFence();
+	
 
 	directAllocator->Reset();
 	directList->Reset(directAllocator, mPipelineState);
@@ -138,24 +144,10 @@ void RenderStage::Run(int index, Project* p)
 
 
 	directList->OMSetRenderTargets(1, &cdh, true, nullptr);
-
 	directList->ClearRenderTargetView(cdh, gClearColor, 0, nullptr);
-
-
 	directList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	directList->IASetVertexBuffers(0, 1, &p->gVertexBufferView);
 
-	//get the current game state
-
-	//->mGameStateHandler.writeNewestGameStateToReadOnlyAtIndex(index);
-	/*gBufferTransferLock.lock();
-	readOnlyState[index] = bufferState;
-	gBufferTransferLock.unlock();*/
-
-	//Update constant buffers and draw triangles
-	//for (int i = 0; i < 100; ++i) {
-
-	//D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gRenderTargetsHeap->GetGPUDescriptorHandleForHeapStart();
 
 	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource[backBufferIndex]->GetGPUVirtualAddress();
 
@@ -187,11 +179,13 @@ void RenderStage::Run(int index, Project* p)
 	//wait for current frame to finish rendering before pushing the next one to GPU
 	//p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 
+
+	
+
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute[] = { directList };
 	p->gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
 
 
-
-	// todo: signal end of renderstage
+	//p->gIntraFrameFence[index].SignalFence(p->gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
 }

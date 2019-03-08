@@ -74,7 +74,14 @@ void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 
 void ComputeStage::Run(int index, Project* p)
 {
+	// wait for the render pass of this frame to be finished
+	//p->gIntraFrameFence[index].WaitForPrevFence();
+
+
 	UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
+	//UINT backBufferIndex = index;
+
+
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 
@@ -82,8 +89,6 @@ void ComputeStage::Run(int index, Project* p)
 	D3D12GraphicsCommandListPtr computeList  = p->gAllocatorsAndLists[index][QUEUE_TYPE_COMPUTE].mCommandList;
 
 
-	// wait for the previous usage of this compute shader output texture to be free to use
-	p->gUAVFence[index].WaitForPrevFence();
 
 	//// Compute shader part ////
 
@@ -140,9 +145,15 @@ void ComputeStage::Run(int index, Project* p)
 	//Close the list to prepare it for execution.
 	computeList->Close();
 
-	//wait for current frame to finish rendering before using it in the compute pass
-	p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 
+
+	//wait for current frame to finish rendering before using it in the compute pass
+	//p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+
+	// wait for the previous usage of this compute shader output texture to be free to use
+	//p->gUAVFence[index].WaitForPrevFence();
+
+	
 
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute2[] = { computeList };
@@ -150,6 +161,8 @@ void ComputeStage::Run(int index, Project* p)
 
 
 	// signal that the pixel shader output texture is free to use again
-	p->gIntermediateBufferFence[index].SignalFence(p->gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue);
+	//p->gIntermediateBufferFence[index].SignalFence(p->gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue);
+
+	//p->gIntraFrameFence[index].SignalFence(p->gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue);
 
 }
