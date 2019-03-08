@@ -153,7 +153,7 @@ void Project::CreateDirect3DDevice(HWND wndHandle)
 		}
 
 		// Check to see if the adapter supports Direct3D 12, but don't create the actual device yet.
-		if (SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_12_1, __uuidof(ID3D12Device5), nullptr)))
+		if (SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_12_1, __uuidof(gDevice5), nullptr)))
 		{
 			break;
 		}
