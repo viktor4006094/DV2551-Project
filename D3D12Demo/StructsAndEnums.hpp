@@ -82,6 +82,39 @@ struct alignas(256) CONSTANT_BUFFER_DATA {
 };
 
 
+struct FenceStruct
+{
+	ID3D12Fence1*		mFence = nullptr;
+	HANDLE				mEventHandle = nullptr;
+	UINT64				mFenceValue = 0;
+
+	void CreateFenceAndEventHandle(D3D12DevPtr dev)
+	{
+		dev->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence));
+		mFenceValue = 1;
+		//Create an event handle to use for GPU synchronization.
+		mEventHandle = CreateEvent(0, false, false, 0);
+	}
+
+	void SignalFence(ID3D12CommandQueue* queue)
+	{
+		//Signal and increment the fence value.
+		const UINT64 fence = mFenceValue;
+		queue->Signal(mFence, fence);
+		mFenceValue++;
+	}
+
+	void WaitForPrevFence()
+	{
+		//Wait until command queue is done.
+		if (mFence->GetCompletedValue() < (mFenceValue-1)) {
+			mFence->SetEventOnCompletion((mFenceValue - 1), mEventHandle);
+			WaitForSingleObject(mEventHandle, INFINITE);
+		}
+	}
+};
+
+
 struct CommandQueueAndFence
 {
 	ID3D12CommandQueue* mQueue = nullptr;

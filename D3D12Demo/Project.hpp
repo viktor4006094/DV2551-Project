@@ -102,6 +102,11 @@ public:
 	//ID3D12Heap1*			gConstantBufferHeap[NUM_SWAP_BUFFERS] = {};
 	ID3D12Resource1*		gConstantBufferResource[NUM_SWAP_BUFFERS]= {};
 
+	FenceStruct gIntermediateBufferFence[NUM_SWAP_BUFFERS];
+	FenceStruct gUAVFence[NUM_SWAP_BUFFERS];
+	FenceStruct gBackBufferFence;
+
+
 	/*struct alignas(256) CONSTANT_BUFFER_DATA {
 		float position[4];
 		float color[4];

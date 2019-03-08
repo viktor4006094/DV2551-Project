@@ -82,9 +82,12 @@ void ComputeStage::Run(int index, Project* p)
 	D3D12GraphicsCommandListPtr computeList  = p->gAllocatorsAndLists[index][QUEUE_TYPE_COMPUTE].mCommandList;
 
 
+	// wait for the previous usage of this compute shader output texture to be free to use
+	p->gUAVFence[index].WaitForPrevFence();
+
 	//// Compute shader part ////
 
-	p->gCommandQueues[QUEUE_TYPE_COMPUTE].WaitForGpu();
+	//p->gCommandQueues[QUEUE_TYPE_COMPUTE].WaitForGpu();
 
 	computeAllocator->Reset();
 	computeList->Reset(computeAllocator, mPipelineState);
@@ -144,4 +147,9 @@ void ComputeStage::Run(int index, Project* p)
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute2[] = { computeList };
 	p->gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
+
+
+	// signal that the pixel shader output texture is free to use again
+	p->gIntermediateBufferFence[index].SignalFence(p->gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue);
+
 }

@@ -96,10 +96,10 @@ void RenderStage::Run(int index, Project* p)
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 	ID3D12CommandAllocator* directAllocator = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
-	D3D12GraphicsCommandListPtr	directList = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
+	D3D12GraphicsCommandListPtr	directList  = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
 
-	ID3D12Fence1* fence = p->gCommandQueues[QUEUE_TYPE_DIRECT].mFence;
-	HANDLE eventHandle = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mEventHandle;
+	//ID3D12Fence1* fence = p->gCommandQueues[QUEUE_TYPE_DIRECT].mFence;
+	//HANDLE eventHandle = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mEventHandle;
 
 	////! since WaitForGPU is called just before the commandlist is executed in the previous frame this does 
 	////! not need to be done here since the command allocator is already guaranteed to have finished executing
@@ -109,6 +109,9 @@ void RenderStage::Run(int index, Project* p)
 	//	fence->SetEventOnCompletion(prevFence, eventHandle);
 	//	WaitForSingleObject(eventHandle, INFINITE);
 	//}
+
+	// wait for the previous usage of this pixel shader output texture to be free to use
+	p->gIntermediateBufferFence[index].WaitForPrevFence();
 
 	directAllocator->Reset();
 	directList->Reset(directAllocator, mPipelineState);
@@ -182,11 +185,13 @@ void RenderStage::Run(int index, Project* p)
 	directList->Close();
 
 	//wait for current frame to finish rendering before pushing the next one to GPU
-	p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+	//p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute[] = { directList };
 	p->gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
 
 
+
+	// todo: signal end of renderstage
 }

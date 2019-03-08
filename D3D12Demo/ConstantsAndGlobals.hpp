@@ -25,7 +25,8 @@ const int SCREEN_HEIGHT = 2*480;	//Height of application.
 
 const FLOAT gClearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
 
-const unsigned int MAX_PREPARED_FRAMES = 2; // number of frames that can be queued
+// todo remove max_prepared_frames and use num_swap_buffers instead
+const unsigned int MAX_PREPARED_FRAMES = 3; // number of frames that can be queued
 const unsigned int NUM_SWAP_BUFFERS = 3; //Number of buffers
 
 
