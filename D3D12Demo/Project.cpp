@@ -7,6 +7,7 @@
 #include <string>
 
 
+
 #include <functional>
 
 Project::Project()
@@ -41,6 +42,33 @@ void Project::Init(HWND wndHandle)
 	mGameStateHandler.CreateMeshes();
 	//CreateMeshes();										//11. Create meshes (all use same triangle but different constant buffers)
 	CreateComputeShaderResources();
+
+	// todo move elsewhere?
+#ifdef _DEBUG
+	std::wstring intStr = L"InterMediateRenderTarget";
+	std::wstring uavStr = L"UAVResource";
+	std::wstring swapStr = L"SwapChainRenderTarget";
+	HRESULT hr = S_OK;
+	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
+		std::wstring wsInt = intStr + std::to_wstring(i);
+		LPCWSTR cInt = wsInt.c_str();
+		hr = gPerFrameResources[i].gIntermediateRenderTarget->SetName(cInt);
+
+		std::wstring wsUAV = uavStr + std::to_wstring(i);
+		LPCWSTR cUAV = wsUAV.c_str();
+		hr = gPerFrameResources[i].gUAVResource->SetName(cUAV);
+
+		std::wstring wsSwap = swapStr + std::to_wstring(i);
+		LPCWSTR cSwap = wsSwap.c_str();
+		hr = gPerFrameResources[i].gSwapChainRenderTarget->SetName(cSwap);
+	}
+
+
+	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->SetName(L"DirectQueue");
+	gCommandQueues[QUEUE_TYPE_COPY].mQueue->SetName(L"CopyQueue");
+	gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->SetName(L"ComputeQueue");
+#endif
+
 
 	WaitForGpu(QUEUE_TYPE_DIRECT);
 }

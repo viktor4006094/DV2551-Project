@@ -53,6 +53,7 @@ inline void CountFPS(HWND wndHandle)
 
 
 
+
 #pragma region Enums
 enum QueueType : size_t {
 	QUEUE_TYPE_DIRECT = 0,
