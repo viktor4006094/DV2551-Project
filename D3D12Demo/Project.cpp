@@ -286,11 +286,10 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 
 	if (SUCCEEDED(hr)) {
 		if (SUCCEEDED(swapChain1->QueryInterface(IID_PPV_ARGS(&gSwapChain4)))) {
-			gSwapChain4->SetMaximumFrameLatency(2); //todo change to 3 ?
+			gSwapChain4->SetMaximumFrameLatency(MAX_FRAME_LATENCY);
 			gSwapChainWaitableObject = gSwapChain4->GetFrameLatencyWaitableObject();
 			
-			
-			//gSwapChain4->Release();
+			swapChain1->Release();
 		}
 	}
 
@@ -746,14 +745,9 @@ void Project::CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex
 	//Close the list to prepare it for execution.
 	directList->Close();
 
-	//wait for current frame to finish its FXAA pass before presenting it
-	//gCommandQueues[QUEUE_TYPE_COMPUTE].WaitForGpu();
-
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute2[] = { directList };
 	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
-
-
 }
 
 void Project::Render(int id)
@@ -775,122 +769,51 @@ void Project::Render(int id)
 
 	threadIndex = lastRenderIterationThreadIndex;
 	lastRenderIterationThreadIndex = (++lastRenderIterationThreadIndex) % NUM_THREADS;
-	
-	
-	
-	// Wait for previous iteration of this swap buffer
-	//if (gSwapBufferFences[swapBufferIndex]->GetCompletedValue() < gSwapBufferFenceValues[swapBufferIndex])
-		//WaitForSingleObject(gSwapBufferFenceEvents[swapBufferIndex], INFINITE);
-
-	InterlockedIncrement(&gSwapBufferFenceValues[swapBufferIndex]);
-	//InterlockedIncrement(&gSwapBufferWaitValues[swapBufferIndex]);
-
-
-	backBufferFenceWaitValue = gBackBufferFenceValue;
-	InterlockedIncrement(&gBackBufferFenceValue);
-	backBufferFenceSignalValue = gBackBufferFenceValue;
 
 	gThreadIDIndexLock.unlock();
 
 	if (isRunning) {
-		WaitForSingleObjectEx(gSwapChainWaitableObject, 1000, true);
 
-
-		mLatestBackBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
+		// Update the index used by the CPU update loop
+		mLatestBackBufferIndex = swapBufferIndex;
 
 		PerFrameResources* perFrame = &gPerFrameResources[swapBufferIndex];
 		PerThreadFenceHandle* perThread = &gPerThreadFenceHandles[threadIndex];
 
+		// Wait for the swap chain so that no more than MAX_FRAME_LATENCY frames are being processed simultaneously
+		// See MAX_FRAME_LATENCY in ConstantsAndGlobals.hpp for the specified amount
+		WaitForSingleObjectEx(gSwapChainWaitableObject, 1000, true);
 
-		//perFrame->WaitForEndOfPrevFrameWithThisIndex();
-
-		//if (gSwapBufferFences[swapBufferIndex]->GetCompletedValue() < gSwapBufferFenceValues[swapBufferIndex])
-		//	WaitForSingleObject(gSwapBufferFenceEvents[swapBufferIndex], INFINITE);
-
-
-		// Render geometry
+		// Render the geometry
 		GPUStages[0]->Run(swapBufferIndex, threadIndex, this);
 
-		// Wait for the render stage
+		//todo move wait calls to after the next list has been recorded but before it starts being executed
+		// Wait for the render stage to finish
 		UINT64 threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
 		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
 		gThreadFences[threadIndex]->SetEventOnCompletion(threadFenceValue, gThreadFenceEvents[threadIndex]);
 		WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
-
 		
+		// Begin the rendering of the next frame once the first part of this frame is done.
 		gThreadPool->push([this](int id) {Render(id); });
 
 
-		// Execute Compute shader and copy the result to the backbuffer
+		// Apply FXAA to the rendered image with a compute shader
 		GPUStages[1]->Run(swapBufferIndex, threadIndex, this);
 
-		
-
-		// Wait for the compute stage
+		// Wait for the compute stage to finish executing
 		threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
 		gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
 		gThreadFences[threadIndex]->SetEventOnCompletion(threadFenceValue, gThreadFenceEvents[threadIndex]);
 		WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
 
-		
-		
-
-		// todo: wait for previous frame to complete here
-		//if (gSwapBufferFences[(swapBufferIndex+NUM_SWAP_BUFFERS-1)%NUM_SWAP_BUFFERS]->GetCompletedValue() < gSwapBufferFenceValues[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS])
-		//	WaitForSingleObject(gSwapBufferFenceEvents[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS], INFINITE);
-		
-		//block thread until swap chain is finished presenting
-
-
-
-		// Wait for previous present of the backbuffer
-		//if (gBackBufferFence->GetCompletedValue() < (backBufferFenceWaitValue))
-			//WaitForSingleObject(gBackBufferFenceEvent[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS], INFINITE);
-
-
-		//gPerFrameResources[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS].WaitForEndOfPrevFrameWithThisIndex();
-		//perThread->WaitForFenceValue(
-		//	gPerFrameResources[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS].mPerFrameFence,
-		//	gPerFrameResources[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS].mPerFrameWaitForValue
-		//);
-
-
-
-
-
+	
+		// Copy the result of the FXAA compute shader to the back buffer
 		CopyComputeOutputToBackBuffer(swapBufferIndex, threadIndex);
 
 
-		//Present the frame.
+		// Present the frame.
 		DXGI_PRESENT_PARAMETERS pp = {};
 		gSwapChain4->Present1(0, 0, &pp);
-
-
-		//gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gSwapBufferFences[swapBufferIndex], gSwapBufferFenceValues[swapBufferIndex]);
-		//gSwapBufferFences[swapBufferIndex]->SetEventOnCompletion(gSwapBufferFenceValues[swapBufferIndex], gSwapBufferFenceEvents[swapBufferIndex]);
-
-
-		//HRESULT hr = gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gBackBufferFence, backBufferFenceSignalValue);
-		//gBackBufferFence->SetEventOnCompletion(backBufferFenceSignalValue, gBackBufferFenceEvent[swapBufferIndex]);
-
-		//if (hr != S_OK) {
-		//	int a = 4;
-		//}
-
-
-		//gThreadIDIndexLock.lock();
-		//gThreadIDIndexLock.unlock();
-
-		//perFrame->SignalEndOfFrame(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
-
-		//threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
-		//gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
-		//gThreadFences[threadIndex]->SetEventOnCompletion(threadFenceValue, gThreadFenceEvents[threadIndex]);
-		//WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
-
-		// signal that this frame is done and that this index is ready to be used again
-
-		//gThreadPool->push([this](int id) {Render(id); });
-
 	}
 }
