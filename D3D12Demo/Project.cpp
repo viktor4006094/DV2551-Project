@@ -51,10 +51,15 @@ void Project::Init(HWND wndHandle)
 
 	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
 		gSwapBufferFenceValues[i] = 0;// NUM_SWAP_BUFFERS; //? 0
+		//gSwapBufferWaitValues[i] = 0;
 		gSwapBufferFenceEvents[i] = CreateEvent(0, false, false, 0);
 		gDevice5->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gSwapBufferFences[i]));
+	
+		
+		gBackBufferFenceEvent[i] = CreateEvent(0, false, false, 0);
 	}
 
+	gDevice5->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gBackBufferFence));
 
 	// todo move elsewhere?
 #ifdef _DEBUG
@@ -261,15 +266,15 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 	scDesc.Stereo = FALSE;
 	scDesc.SampleDesc.Count = 1;
 	scDesc.SampleDesc.Quality = 0;
-	scDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT;
+	scDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	scDesc.BufferCount = NUM_SWAP_BUFFERS;
 	scDesc.Scaling = DXGI_SCALING_NONE;
 	scDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	scDesc.Flags = 0;
+	scDesc.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT; // Enable GetFrameLatencyWaitableObject();
 	scDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
 
 	IDXGISwapChain1* swapChain1 = nullptr;
-
+	
 	HRESULT hr = factory->CreateSwapChainForHwnd(
 		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue,
 		wndHandle,
@@ -278,9 +283,14 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 		nullptr,
 		&swapChain1);
 
+
 	if (SUCCEEDED(hr)) {
 		if (SUCCEEDED(swapChain1->QueryInterface(IID_PPV_ARGS(&gSwapChain4)))) {
-			gSwapChain4->Release();
+			gSwapChain4->SetMaximumFrameLatency(2); //todo change to 3 ?
+			gSwapChainWaitableObject = gSwapChain4->GetFrameLatencyWaitableObject();
+			
+			
+			//gSwapChain4->Release();
 		}
 	}
 
@@ -752,28 +762,47 @@ void Project::Render(int id)
 	static int lastRenderIterationThreadIndex = 0;
 	thread_local int swapBufferIndex;
 	thread_local int threadIndex;
-
+	thread_local UINT64 backBufferFenceWaitValue;
+	thread_local UINT64 backBufferFenceSignalValue;
+	//static int testCounter = 0;
 
 	//get the thread index
 	gThreadIDIndexLock.lock();
 	CountFPS(mWndHandle);
-
+	
 	swapBufferIndex = lastRenderIterationSwapBufferIndex;
 	lastRenderIterationSwapBufferIndex = (++lastRenderIterationSwapBufferIndex) % NUM_SWAP_BUFFERS;
 
 	threadIndex = lastRenderIterationThreadIndex;
 	lastRenderIterationThreadIndex = (++lastRenderIterationThreadIndex) % NUM_THREADS;
+	
+	
+	
+	// Wait for previous iteration of this swap buffer
+	//if (gSwapBufferFences[swapBufferIndex]->GetCompletedValue() < gSwapBufferFenceValues[swapBufferIndex])
+		//WaitForSingleObject(gSwapBufferFenceEvents[swapBufferIndex], INFINITE);
+
+	InterlockedIncrement(&gSwapBufferFenceValues[swapBufferIndex]);
+	//InterlockedIncrement(&gSwapBufferWaitValues[swapBufferIndex]);
+
+
+	backBufferFenceWaitValue = gBackBufferFenceValue;
+	InterlockedIncrement(&gBackBufferFenceValue);
+	backBufferFenceSignalValue = gBackBufferFenceValue;
+
 	gThreadIDIndexLock.unlock();
 
 	if (isRunning) {
+		WaitForSingleObjectEx(gSwapChainWaitableObject, 1000, true);
+
+
 		mLatestBackBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 
 		PerFrameResources* perFrame = &gPerFrameResources[swapBufferIndex];
 		PerThreadFenceHandle* perThread = &gPerThreadFenceHandles[threadIndex];
 
 
-		perFrame->WaitForEndOfPrevFrameWithThisIndex();
-
+		//perFrame->WaitForEndOfPrevFrameWithThisIndex();
 
 		//if (gSwapBufferFences[swapBufferIndex]->GetCompletedValue() < gSwapBufferFenceValues[swapBufferIndex])
 		//	WaitForSingleObject(gSwapBufferFenceEvents[swapBufferIndex], INFINITE);
@@ -789,6 +818,9 @@ void Project::Render(int id)
 		WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
 
 		
+		gThreadPool->push([this](int id) {Render(id); });
+
+
 		// Execute Compute shader and copy the result to the backbuffer
 		GPUStages[1]->Run(swapBufferIndex, threadIndex, this);
 
@@ -800,7 +832,6 @@ void Project::Render(int id)
 		gThreadFences[threadIndex]->SetEventOnCompletion(threadFenceValue, gThreadFenceEvents[threadIndex]);
 		WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
 
-		gThreadPool->push([this](int id) {Render(id); });
 		
 		
 
@@ -808,11 +839,22 @@ void Project::Render(int id)
 		//if (gSwapBufferFences[(swapBufferIndex+NUM_SWAP_BUFFERS-1)%NUM_SWAP_BUFFERS]->GetCompletedValue() < gSwapBufferFenceValues[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS])
 		//	WaitForSingleObject(gSwapBufferFenceEvents[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS], INFINITE);
 		
-		gPerFrameResources[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS].WaitForEndOfPrevFrameWithThisIndex();
+		//block thread until swap chain is finished presenting
+
+
+
+		// Wait for previous present of the backbuffer
+		//if (gBackBufferFence->GetCompletedValue() < (backBufferFenceWaitValue))
+			//WaitForSingleObject(gBackBufferFenceEvent[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS], INFINITE);
+
+
+		//gPerFrameResources[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS].WaitForEndOfPrevFrameWithThisIndex();
 		//perThread->WaitForFenceValue(
 		//	gPerFrameResources[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS].mPerFrameFence,
 		//	gPerFrameResources[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS].mPerFrameWaitForValue
 		//);
+
+
 
 
 
@@ -823,19 +865,28 @@ void Project::Render(int id)
 		DXGI_PRESENT_PARAMETERS pp = {};
 		gSwapChain4->Present1(0, 0, &pp);
 
+
+		//gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gSwapBufferFences[swapBufferIndex], gSwapBufferFenceValues[swapBufferIndex]);
+		//gSwapBufferFences[swapBufferIndex]->SetEventOnCompletion(gSwapBufferFenceValues[swapBufferIndex], gSwapBufferFenceEvents[swapBufferIndex]);
+
+
+		//HRESULT hr = gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gBackBufferFence, backBufferFenceSignalValue);
+		//gBackBufferFence->SetEventOnCompletion(backBufferFenceSignalValue, gBackBufferFenceEvent[swapBufferIndex]);
+
+		//if (hr != S_OK) {
+		//	int a = 4;
+		//}
+
+
 		//gThreadIDIndexLock.lock();
 		//gThreadIDIndexLock.unlock();
 
-		perFrame->SignalEndOfFrame(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
+		//perFrame->SignalEndOfFrame(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
 
 		//threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
 		//gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
 		//gThreadFences[threadIndex]->SetEventOnCompletion(threadFenceValue, gThreadFenceEvents[threadIndex]);
 		//WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
-
-		//UINT64 frameFenceValue = InterlockedIncrement(&gSwapBufferFenceValues[swapBufferIndex]);
-		//gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gSwapBufferFences[swapBufferIndex], frameFenceValue);
-		//gThreadFences[threadIndex]->SetEventOnCompletion(frameFenceValue, gSwapBufferFenceEvents[swapBufferIndex]);
 
 		// signal that this frame is done and that this index is ready to be used again
 
