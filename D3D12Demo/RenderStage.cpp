@@ -93,6 +93,9 @@ void RenderStage::Run(int index, Project* p)
 	static size_t lastRenderIterationIndex = 0;
 
 	UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
+	PerFrameResources* perFrame = &p->gPerFrameResources[backBufferIndex];
+
+
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 	ID3D12CommandAllocator* directAllocator = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
@@ -122,7 +125,7 @@ void RenderStage::Run(int index, Project* p)
 
 
 	// Indicate that the intermediate buffer will be used as a render target
-	SetResourceTransitionBarrier(directList, p->gIntermediateRenderTargets[backBufferIndex],
+	SetResourceTransitionBarrier(directList, perFrame->gIntermediateRenderTarget,
 		D3D12_RESOURCE_STATE_COMMON,
 		D3D12_RESOURCE_STATE_RENDER_TARGET
 	);
@@ -172,7 +175,7 @@ void RenderStage::Run(int index, Project* p)
 	}
 
 	// set state to common since this is used in by the compute queue as well
-	SetResourceTransitionBarrier(directList, p->gIntermediateRenderTargets[backBufferIndex],
+	SetResourceTransitionBarrier(directList, perFrame->gIntermediateRenderTarget,
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_COMMON
 	);

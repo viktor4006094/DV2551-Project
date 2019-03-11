@@ -64,6 +64,9 @@ public:
 
 
 
+	PerFrameResources gPerFrameResources[NUM_SWAP_BUFFERS] = {};
+
+
 	CommandQueueAndFence gCommandQueues[3];
 	CommandAllocatorAndList gAllocatorsAndLists[MAX_PREPARED_FRAMES][3];
 
@@ -74,19 +77,18 @@ public:
 
 	// Render targets used by the render stage
 	ID3D12DescriptorHeap*	gIntermediateRenderTargetsDescHeap = nullptr;
-	ID3D12Resource1*		gIntermediateRenderTargets[NUM_SWAP_BUFFERS] = {};
+	//ID3D12Resource1*		gIntermediateRenderTargets[NUM_SWAP_BUFFERS] = {};
 	
 	// render targets used as the final backbuffer of the frame
 	ID3D12DescriptorHeap*	gSwapChainRenderTargetsDescHeap = nullptr;
-	ID3D12Resource1*		gSwapChainRenderTargets[NUM_SWAP_BUFFERS] = {};
+	//ID3D12Resource1*		gSwapChainRenderTargets[NUM_SWAP_BUFFERS] = {};
 	UINT					gRenderTargetDescriptorSize = 0;
 	//UINT					gFrameIndex							= 0;
 
 
 	//Compute shader UAV and SRV
-	ID3D12Resource1*			gSRVofBackBuffer = nullptr;
 	ID3D12DescriptorHeap*		gComputeDescriptorHeap = nullptr;
-	ID3D12Resource1*			gUAVResource[NUM_SWAP_BUFFERS] = {};
+	//ID3D12Resource1*			gUAVResource[NUM_SWAP_BUFFERS] = {};
 
 	D3D12_VIEWPORT				gViewport = {};
 	D3D12_RECT					gScissorRect = {};

@@ -75,6 +75,8 @@ void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 void ComputeStage::Run(int index, Project* p)
 {
 	UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
+	PerFrameResources* perFrame = &p->gPerFrameResources[backBufferIndex];
+
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 
@@ -93,7 +95,7 @@ void ComputeStage::Run(int index, Project* p)
 	computeList->SetComputeRootSignature(p->gRootSignature);
 
 	// Set the correct state for the input, will be set to common between queue types
-	SetResourceTransitionBarrier(computeList, p->gIntermediateRenderTargets[backBufferIndex],
+	SetResourceTransitionBarrier(computeList, perFrame->gIntermediateRenderTarget,
 		D3D12_RESOURCE_STATE_COMMON,
 		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
 	);
@@ -110,7 +112,7 @@ void ComputeStage::Run(int index, Project* p)
 	computeList->SetComputeRootDescriptorTable(1, gdh);
 
 
-	SetResourceTransitionBarrier(computeList, p->gUAVResource[backBufferIndex],
+	SetResourceTransitionBarrier(computeList, perFrame->gUAVResource,
 		D3D12_RESOURCE_STATE_COPY_SOURCE,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
 	);
@@ -121,14 +123,14 @@ void ComputeStage::Run(int index, Project* p)
 
 	computeList->Dispatch(squaresWide, squaresHigh, 1);
 
-	SetResourceTransitionBarrier(computeList, p->gUAVResource[backBufferIndex],
+	SetResourceTransitionBarrier(computeList, perFrame->gUAVResource,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 		D3D12_RESOURCE_STATE_COMMON
 	);
 
 
 	// set state to common since this is used in by the direct queue as well
-	SetResourceTransitionBarrier(computeList, p->gIntermediateRenderTargets[backBufferIndex],
+	SetResourceTransitionBarrier(computeList, perFrame->gIntermediateRenderTarget,
 		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
 		D3D12_RESOURCE_STATE_COMMON
 	);

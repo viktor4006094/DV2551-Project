@@ -81,6 +81,20 @@ struct alignas(256) CONSTANT_BUFFER_DATA {
 	float4 color;
 };
 
+struct PerFrameResources
+{
+	ID3D12Resource1* gIntermediateRenderTarget = nullptr;
+	ID3D12Resource1* gUAVResource = nullptr;
+	ID3D12Resource1* gSwapChainRenderTarget = nullptr;
+
+
+	void Release()
+	{
+		SafeRelease(&gIntermediateRenderTarget);
+		SafeRelease(&gUAVResource);
+		SafeRelease(&gSwapChainRenderTarget);
+	}
+};
 
 struct CommandQueueAndFence
 {

@@ -100,7 +100,10 @@ void Project::Shutdown()
 	{
 		SafeRelease(&gDescriptorHeap[i]);
 		SafeRelease(&gConstantBufferResource[i]);
-		SafeRelease(&gSwapChainRenderTargets[i]);
+		
+		
+		gPerFrameResources[i].Release();
+		//SafeRelease(&gSwapChainRenderTargets[i]);
 	}
 
 	SafeRelease(&gRootSignature);
@@ -268,8 +271,8 @@ void Project::CreateRenderTargets()
 	//One RTV for each frame.
 	for (UINT n = 0; n < NUM_SWAP_BUFFERS; n++)
 	{
-		hr = gSwapChain4->GetBuffer(n, IID_PPV_ARGS(&gSwapChainRenderTargets[n]));
-		gDevice5->CreateRenderTargetView(gSwapChainRenderTargets[n], nullptr, cdh);
+		hr = gSwapChain4->GetBuffer(n, IID_PPV_ARGS(&gPerFrameResources[n].gSwapChainRenderTarget));
+		gDevice5->CreateRenderTargetView(gPerFrameResources[n].gSwapChainRenderTarget, nullptr, cdh);
 		cdh.ptr += gRenderTargetDescriptorSize;
 	}
 }
@@ -478,7 +481,7 @@ void Project::CreateComputeShaderResources()
 		HRESULT hr = gDevice5->CreateCommittedResource(
 			&intRThp, D3D12_HEAP_FLAG_NONE, &intRTresDesc,
 			D3D12_RESOURCE_STATE_COMMON,
-			&clv, IID_PPV_ARGS(&gIntermediateRenderTargets[i]));
+			&clv, IID_PPV_ARGS(&gPerFrameResources[i].gIntermediateRenderTarget));
 	}
 
 
@@ -503,7 +506,7 @@ void Project::CreateComputeShaderResources()
 		HRESULT hr = gDevice5->CreateCommittedResource(
 			&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
 			D3D12_RESOURCE_STATE_COPY_SOURCE,
-			nullptr, IID_PPV_ARGS(&gUAVResource[i]));
+			nullptr, IID_PPV_ARGS(&gPerFrameResources[i].gUAVResource));
 	}
 
 
@@ -527,7 +530,7 @@ void Project::CreateComputeShaderResources()
 	D3D12_CPU_DESCRIPTOR_HANDLE cdh = gComputeDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
 
 	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
-		gDevice5->CreateUnorderedAccessView(gUAVResource[i], nullptr, &uavDesc, cdh);
+		gDevice5->CreateUnorderedAccessView(gPerFrameResources[i].gUAVResource, nullptr, &uavDesc, cdh);
 		cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
 
@@ -540,7 +543,7 @@ void Project::CreateComputeShaderResources()
 
 	for (int i = 0; i < NUM_SWAP_BUFFERS; i++) {
 		//gDevice5->CreateShaderResourceView(gSwapChainRenderTargets[i], &srvDesc, cdh); //old
-		gDevice5->CreateShaderResourceView(gIntermediateRenderTargets[i], &srvDesc, cdh); //new
+		gDevice5->CreateShaderResourceView(gPerFrameResources[i].gIntermediateRenderTarget, &srvDesc, cdh); //new
 		cdh.ptr += gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
 
@@ -561,7 +564,7 @@ void Project::CreateComputeShaderResources()
 	for (UINT n = 0; n < NUM_SWAP_BUFFERS; n++)
 	{
 		//hr = gSwapChain4->GetBuffer(n, IID_PPV_ARGS(&gIntermediateRenderTargets[n]));
-		gDevice5->CreateRenderTargetView(gIntermediateRenderTargets[n], nullptr, rtvcdh);
+		gDevice5->CreateRenderTargetView(gPerFrameResources[n].gIntermediateRenderTarget, nullptr, rtvcdh);
 		rtvcdh.ptr += gRenderTargetDescriptorSize;
 	}
 
@@ -651,31 +654,36 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 	//// Present part ////
 
 	UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
+	
+	PerFrameResources* perFrame = &gPerFrameResources[backBufferIndex];
+	
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
 	D3D12GraphicsCommandListPtr directList = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
+
+
 
 	// todo fence
 
 	directAllocator->Reset();
 	directList->Reset(directAllocator, nullptr);
 
-	SetResourceTransitionBarrier(directList, gUAVResource[backBufferIndex],
+	SetResourceTransitionBarrier(directList, perFrame->gUAVResource,
 		D3D12_RESOURCE_STATE_COMMON,
 		D3D12_RESOURCE_STATE_COPY_SOURCE
 	);
 
 	//Indicate that the back buffer will be used as render target.
-	SetResourceTransitionBarrier(directList, gSwapChainRenderTargets[backBufferIndex],
+	SetResourceTransitionBarrier(directList, perFrame->gSwapChainRenderTarget,
 		D3D12_RESOURCE_STATE_PRESENT,
 		D3D12_RESOURCE_STATE_COPY_DEST
 	);
 
-	directList->CopyResource(gSwapChainRenderTargets[backBufferIndex], gUAVResource[backBufferIndex]);
+	directList->CopyResource(perFrame->gSwapChainRenderTarget, perFrame->gUAVResource);
 
 	//Indicate that the back buffer will be used as render target.
-	SetResourceTransitionBarrier(directList, gSwapChainRenderTargets[backBufferIndex],
+	SetResourceTransitionBarrier(directList, perFrame->gSwapChainRenderTarget,
 		D3D12_RESOURCE_STATE_COPY_DEST,
 		D3D12_RESOURCE_STATE_PRESENT
 	);
