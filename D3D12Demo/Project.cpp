@@ -24,7 +24,7 @@ void Project::Init(HWND wndHandle)
 	// copy window handle so that we can change the title of the window later
 	mWndHandle = wndHandle;
 
-	gThreadPool = new ctpl::thread_pool(10);
+	gThreadPool = new ctpl::thread_pool(NUM_THREADS);
 
 	GPUStages[0] = new RenderStage();
 	GPUStages[1] = new ComputeStage();
@@ -43,6 +43,19 @@ void Project::Init(HWND wndHandle)
 	//CreateMeshes();										//11. Create meshes (all use same triangle but different constant buffers)
 	CreateComputeShaderResources();
 
+	for (int i = 0; i < NUM_THREADS; ++i) {
+		gThreadFenceValues[i] = 0;
+		gThreadFenceEvents[i] = CreateEvent(0, false, false, 0);
+		gDevice5->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gThreadFences[i]));
+	}
+
+	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
+		gSwapBufferFenceValues[i] = 0;// NUM_SWAP_BUFFERS; //? 0
+		gSwapBufferFenceEvents[i] = CreateEvent(0, false, false, 0);
+		gDevice5->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gSwapBufferFences[i]));
+	}
+
+
 	// todo move elsewhere?
 #ifdef _DEBUG
 	std::wstring intStr = L"InterMediateRenderTarget";
@@ -60,7 +73,7 @@ void Project::Init(HWND wndHandle)
 
 		std::wstring wsSwap = swapStr + std::to_wstring(i);
 		LPCWSTR cSwap = wsSwap.c_str();
-		hr = gPerFrameResources[i].gSwapChainRenderTarget->SetName(cSwap);
+		hr = gSwapChainRenderTargets[i]->SetName(cSwap);
 	}
 
 
@@ -102,7 +115,7 @@ void Project::Shutdown()
 	gCommandQueues[1].Release();
 	gCommandQueues[2].Release();
 
-	for (int i = 0; i < MAX_PREPARED_FRAMES; ++i) {
+	for (int i = 0; i < NUM_THREADS; ++i) {
 		gAllocatorsAndLists[i][0].Release();
 		gAllocatorsAndLists[i][1].Release();
 		gAllocatorsAndLists[i][2].Release();
@@ -231,7 +244,7 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 	//Create command allocator. The command allocator object corresponds
 	//to the underlying allocations in which GPU commands are stored.
 	//Create command list.
-	for (int i = 0; i < MAX_PREPARED_FRAMES; ++i) {
+	for (int i = 0; i < NUM_THREADS; ++i) {
 		gAllocatorsAndLists[i][0].CreateCommandListAndAllocator(QUEUE_TYPE_DIRECT, gDevice5);
 		gAllocatorsAndLists[i][1].CreateCommandListAndAllocator(QUEUE_TYPE_COPY, gDevice5);
 		gAllocatorsAndLists[i][2].CreateCommandListAndAllocator(QUEUE_TYPE_COMPUTE, gDevice5);
@@ -280,6 +293,11 @@ void Project::CreateFenceAndEventHandle()
 	gCommandQueues[QUEUE_TYPE_DIRECT].CreateFenceAndEventHandle(gDevice5);
 	gCommandQueues[QUEUE_TYPE_COPY].CreateFenceAndEventHandle(gDevice5);
 	gCommandQueues[QUEUE_TYPE_COMPUTE].CreateFenceAndEventHandle(gDevice5);
+
+	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
+		gPerFrameResources[i].CreateFenceAndEventHandle(gDevice5);
+	}
+
 }
 
 void Project::CreateRenderTargets()
@@ -299,8 +317,8 @@ void Project::CreateRenderTargets()
 	//One RTV for each frame.
 	for (UINT n = 0; n < NUM_SWAP_BUFFERS; n++)
 	{
-		hr = gSwapChain4->GetBuffer(n, IID_PPV_ARGS(&gPerFrameResources[n].gSwapChainRenderTarget));
-		gDevice5->CreateRenderTargetView(gPerFrameResources[n].gSwapChainRenderTarget, nullptr, cdh);
+		hr = gSwapChain4->GetBuffer(n, IID_PPV_ARGS(&gSwapChainRenderTargets[n]));
+		gDevice5->CreateRenderTargetView(gSwapChainRenderTargets[n], nullptr, cdh);
 		cdh.ptr += gRenderTargetDescriptorSize;
 	}
 }
@@ -677,22 +695,19 @@ void Project::CreateConstantBufferResources()
 	}
 }
 
-void Project::CopyComputeOutputToBackBuffer(int index)
+void Project::CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex)
 {
 	//// Present part ////
 
 	UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 	
-	PerFrameResources* perFrame = &gPerFrameResources[backBufferIndex];
+	PerFrameResources* perFrame = &gPerFrameResources[swapBufferIndex];
 	
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
-	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
-	D3D12GraphicsCommandListPtr directList = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
+	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[threadIndex][QUEUE_TYPE_DIRECT].mAllocator;
+	D3D12GraphicsCommandListPtr directList = gAllocatorsAndLists[threadIndex][QUEUE_TYPE_DIRECT].mCommandList;
 
-
-
-	// todo fence
 
 	directAllocator->Reset();
 	directList->Reset(directAllocator, nullptr);
@@ -703,15 +718,16 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 	);
 
 	//Indicate that the back buffer will be used as render target.
-	SetResourceTransitionBarrier(directList, perFrame->gSwapChainRenderTarget,
+	SetResourceTransitionBarrier(directList, gSwapChainRenderTargets[backBufferIndex],
 		D3D12_RESOURCE_STATE_PRESENT,
 		D3D12_RESOURCE_STATE_COPY_DEST
 	);
 
-	directList->CopyResource(perFrame->gSwapChainRenderTarget, perFrame->gUAVResource);
+
+	directList->CopyResource(gSwapChainRenderTargets[backBufferIndex], perFrame->gUAVResource);
 
 	//Indicate that the back buffer will be used as render target.
-	SetResourceTransitionBarrier(directList, perFrame->gSwapChainRenderTarget,
+	SetResourceTransitionBarrier(directList, gSwapChainRenderTargets[backBufferIndex],
 		D3D12_RESOURCE_STATE_COPY_DEST,
 		D3D12_RESOURCE_STATE_PRESENT
 	);
@@ -721,7 +737,7 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 	directList->Close();
 
 	//wait for current frame to finish its FXAA pass before presenting it
-	gCommandQueues[QUEUE_TYPE_COMPUTE].WaitForGpu();
+	//gCommandQueues[QUEUE_TYPE_COMPUTE].WaitForGpu();
 
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute2[] = { directList };
@@ -732,39 +748,98 @@ void Project::CopyComputeOutputToBackBuffer(int index)
 
 void Project::Render(int id)
 {
-	static int lastRenderIterationIndex = 0;
-	thread_local int index;
+	static int lastRenderIterationSwapBufferIndex = 0;
+	static int lastRenderIterationThreadIndex = 0;
+	thread_local int swapBufferIndex;
+	thread_local int threadIndex;
 
-	CountFPS(mWndHandle);
 
 	//get the thread index
 	gThreadIDIndexLock.lock();
-	index = lastRenderIterationIndex;
-	lastRenderIterationIndex = (++lastRenderIterationIndex) % MAX_PREPARED_FRAMES;
+	CountFPS(mWndHandle);
+
+	swapBufferIndex = lastRenderIterationSwapBufferIndex;
+	lastRenderIterationSwapBufferIndex = (++lastRenderIterationSwapBufferIndex) % NUM_SWAP_BUFFERS;
+
+	threadIndex = lastRenderIterationThreadIndex;
+	lastRenderIterationThreadIndex = (++lastRenderIterationThreadIndex) % NUM_THREADS;
 	gThreadIDIndexLock.unlock();
 
 	if (isRunning) {
 		mLatestBackBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 
+		PerFrameResources* perFrame = &gPerFrameResources[swapBufferIndex];
+		PerThreadFenceHandle* perThread = &gPerThreadFenceHandles[threadIndex];
+
+
+		perFrame->WaitForEndOfPrevFrameWithThisIndex();
+
+
+		//if (gSwapBufferFences[swapBufferIndex]->GetCompletedValue() < gSwapBufferFenceValues[swapBufferIndex])
+		//	WaitForSingleObject(gSwapBufferFenceEvents[swapBufferIndex], INFINITE);
+
+
 		// Render geometry
-		GPUStages[0]->Run(index, this);
+		GPUStages[0]->Run(swapBufferIndex, threadIndex, this);
 
-		//todo start new render thread here
+		// Wait for the render stage
+		UINT64 threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
+		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
+		gThreadFences[threadIndex]->SetEventOnCompletion(threadFenceValue, gThreadFenceEvents[threadIndex]);
+		WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
 
+		
 		// Execute Compute shader and copy the result to the backbuffer
-		GPUStages[1]->Run(index, this);
+		GPUStages[1]->Run(swapBufferIndex, threadIndex, this);
 
+		
 
-		CopyComputeOutputToBackBuffer(index);
-
+		// Wait for the compute stage
+		threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
+		gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
+		gThreadFences[threadIndex]->SetEventOnCompletion(threadFenceValue, gThreadFenceEvents[threadIndex]);
+		WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
 
 		gThreadPool->push([this](int id) {Render(id); });
+		
+		
+
+		// todo: wait for previous frame to complete here
+		//if (gSwapBufferFences[(swapBufferIndex+NUM_SWAP_BUFFERS-1)%NUM_SWAP_BUFFERS]->GetCompletedValue() < gSwapBufferFenceValues[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS])
+		//	WaitForSingleObject(gSwapBufferFenceEvents[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS], INFINITE);
+		
+		gPerFrameResources[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS].WaitForEndOfPrevFrameWithThisIndex();
+		//perThread->WaitForFenceValue(
+		//	gPerFrameResources[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS].mPerFrameFence,
+		//	gPerFrameResources[(swapBufferIndex + NUM_SWAP_BUFFERS - 1) % NUM_SWAP_BUFFERS].mPerFrameWaitForValue
+		//);
+
+
+
+		CopyComputeOutputToBackBuffer(swapBufferIndex, threadIndex);
 
 
 		//Present the frame.
 		DXGI_PRESENT_PARAMETERS pp = {};
 		gSwapChain4->Present1(0, 0, &pp);
 
+		//gThreadIDIndexLock.lock();
+		//gThreadIDIndexLock.unlock();
+
+		perFrame->SignalEndOfFrame(gCommandQueues[QUEUE_TYPE_DIRECT].mQueue);
+
+		//threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
+		//gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
+		//gThreadFences[threadIndex]->SetEventOnCompletion(threadFenceValue, gThreadFenceEvents[threadIndex]);
+		//WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
+
+		//UINT64 frameFenceValue = InterlockedIncrement(&gSwapBufferFenceValues[swapBufferIndex]);
+		//gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gSwapBufferFences[swapBufferIndex], frameFenceValue);
+		//gThreadFences[threadIndex]->SetEventOnCompletion(frameFenceValue, gSwapBufferFenceEvents[swapBufferIndex]);
+
+		// signal that this frame is done and that this index is ready to be used again
+
+		//gThreadPool->push([this](int id) {Render(id); });
 
 	}
 }

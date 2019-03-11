@@ -9,6 +9,8 @@
 
 //#define VETTIG_DATOR
 
+const unsigned int NUM_THREADS = 10;
+
 // TOTAL_TRIS pretty much decides how many drawcalls in a brute force approach.
 constexpr int TOTAL_TRIS = 150;
 // this has to do with how the triangles are spread in the screen, not important.

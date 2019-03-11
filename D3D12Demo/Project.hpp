@@ -48,7 +48,7 @@ public:
 	void CreateComputeShaderResources();
 	void CreateConstantBufferResources();
 
-	void CopyComputeOutputToBackBuffer(int index);
+	void CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex);
 	void Render(int id);
 
 	// ensure 256 bit alignment for the constant buffer
@@ -68,7 +68,19 @@ public:
 
 
 	CommandQueueAndFence gCommandQueues[3];
-	CommandAllocatorAndList gAllocatorsAndLists[MAX_PREPARED_FRAMES][3];
+	CommandAllocatorAndList gAllocatorsAndLists[NUM_THREADS][3];
+
+	PerThreadFenceHandle gPerThreadFenceHandles[NUM_THREADS] = {};
+
+	UINT64 gThreadFenceValues[NUM_THREADS] = { 0 };
+	HANDLE gThreadFenceEvents[NUM_THREADS] = { nullptr };
+	ID3D12Fence1* gThreadFences[NUM_THREADS] = { nullptr };
+
+
+	UINT64 gSwapBufferFenceValues[NUM_SWAP_BUFFERS] = { 0 };
+	HANDLE gSwapBufferFenceEvents[NUM_SWAP_BUFFERS] = { nullptr };
+	ID3D12Fence1* gSwapBufferFences[NUM_SWAP_BUFFERS] = { nullptr };
+
 
 	D3D12DevPtr gDevice5 = nullptr; // ID3D12Device
 
@@ -81,7 +93,7 @@ public:
 	
 	// render targets used as the final backbuffer of the frame
 	ID3D12DescriptorHeap*	gSwapChainRenderTargetsDescHeap = nullptr;
-	//ID3D12Resource1*		gSwapChainRenderTargets[NUM_SWAP_BUFFERS] = {};
+	ID3D12Resource1*		gSwapChainRenderTargets[NUM_SWAP_BUFFERS] = {};
 	UINT					gRenderTargetDescriptorSize = 0;
 	//UINT					gFrameIndex							= 0;
 

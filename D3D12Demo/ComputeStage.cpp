@@ -72,21 +72,23 @@ void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 	//todo release pointers
 }
 
-void ComputeStage::Run(int index, Project* p)
+void ComputeStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 {
-	UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
-	PerFrameResources* perFrame = &p->gPerFrameResources[backBufferIndex];
+	//UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
+	//UINT backBufferIndex = index;
+	
+	PerFrameResources* perFrame = &p->gPerFrameResources[swapBufferIndex];
 
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 
-	ID3D12CommandAllocator* computeAllocator = p->gAllocatorsAndLists[index][QUEUE_TYPE_COMPUTE].mAllocator;
-	D3D12GraphicsCommandListPtr computeList  = p->gAllocatorsAndLists[index][QUEUE_TYPE_COMPUTE].mCommandList;
+	ID3D12CommandAllocator* computeAllocator = p->gAllocatorsAndLists[threadIndex][QUEUE_TYPE_COMPUTE].mAllocator;
+	D3D12GraphicsCommandListPtr computeList  = p->gAllocatorsAndLists[threadIndex][QUEUE_TYPE_COMPUTE].mCommandList;
 
 
 	//// Compute shader part ////
 
-	p->gCommandQueues[QUEUE_TYPE_COMPUTE].WaitForGpu();
+	//p->gCommandQueues[QUEUE_TYPE_COMPUTE].WaitForGpu();
 
 	computeAllocator->Reset();
 	computeList->Reset(computeAllocator, mPipelineState);
@@ -105,10 +107,10 @@ void ComputeStage::Run(int index, Project* p)
 	computeList->SetDescriptorHeaps(_countof(dheap1), dheap1);
 
 	D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*backBufferIndex;
+	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*swapBufferIndex;
 	computeList->SetComputeRootDescriptorTable(2, gdh);
-	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*(NUM_SWAP_BUFFERS-backBufferIndex);
-	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*backBufferIndex;
+	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*(NUM_SWAP_BUFFERS - swapBufferIndex);
+	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*swapBufferIndex;
 	computeList->SetComputeRootDescriptorTable(1, gdh);
 
 
@@ -118,10 +120,14 @@ void ComputeStage::Run(int index, Project* p)
 	);
 
 
+
 	static const UINT squaresWide = SCREEN_WIDTH / 40U;
 	static const UINT squaresHigh = SCREEN_HEIGHT / 20U;
 
 	computeList->Dispatch(squaresWide, squaresHigh, 1);
+
+
+	SetUAVTransitionBarrier(computeList, perFrame->gUAVResource);
 
 	SetResourceTransitionBarrier(computeList, perFrame->gUAVResource,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
@@ -136,11 +142,12 @@ void ComputeStage::Run(int index, Project* p)
 	);
 
 
+
 	//Close the list to prepare it for execution.
 	computeList->Close();
 
 	//wait for current frame to finish rendering before using it in the compute pass
-	p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+	//p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 
 
 	//Execute the command list.
