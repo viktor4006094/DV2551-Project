@@ -1,7 +1,7 @@
 #include "Project.hpp"
 #include "RenderStage.hpp"
 #include "ComputeStage.hpp"
-
+#include "DragonTriangles.h"
 #include <chrono>
 #include <ctime>
 #include <string>
@@ -298,12 +298,17 @@ void Project::CreateShadersAndPipelineStates()
 
 void Project::CreateTriangleData()
 {
-	Vertex triangleVertices[3] =
-	{
-		{ 0.0f,  0.05f, 0.0f, 1.0f },
-		{ 0.05f, -0.05f, 0.0f, 1.0f },
-		{ -0.05f, -0.05f, 0.0f, 1.0f }
-	};
+	//Vertex triangleVertices[6] =
+	//{	
+	//	{ -0.05f, -0.05f, 0.0f, 1.0f },
+	//	{-0.05f,0.05f,0.0f,1.0f},
+	//	{0.05f,-0.05f,0.0f,1.0f},
+
+	//	{-0.05f,0.05f,0.0f,1.0f},
+	//	{0.05f,0.05f,0.0f,1.0f},
+	//	{ 0.05f, -0.05f, 0.0f, 1.0f }
+
+	//};
 
 	//Note: using upload heaps to transfer static data like vert buffers is not 
 	//recommended. Every time the GPU needs it, the upload heap will be marshalled 

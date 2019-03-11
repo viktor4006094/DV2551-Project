@@ -68,6 +68,7 @@ enum QueueType : size_t {
 struct Vertex
 {
 	float x, y, z, w; // Position
+	float a, b, c, d;//normal
 	//float r,g,b; // Color
 };
 
@@ -79,6 +80,7 @@ struct float4
 
 struct alignas(256) CONSTANT_BUFFER_DATA {
 	DirectX::XMFLOAT4X4 world;
+	DirectX::XMFLOAT4X4 viewProj;
 	//float4 position;
 	float4 color;
 };

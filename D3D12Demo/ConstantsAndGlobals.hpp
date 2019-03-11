@@ -10,7 +10,7 @@
 //#define VETTIG_DATOR
 
 // TOTAL_TRIS pretty much decides how many drawcalls in a brute force approach.
-constexpr int TOTAL_TRIS = 150;
+constexpr int TOTAL_TRIS = 1;
 // this has to do with how the triangles are spread in the screen, not important.
 constexpr int TOTAL_PLACES = 2 * 400 * 20;
 

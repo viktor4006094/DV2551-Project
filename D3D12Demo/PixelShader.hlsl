@@ -1,16 +1,22 @@
 struct VSOut
 {
 	float4 pos		: SV_POSITION;
+	float4 normal	: GNORMAL;
 	float4 color	: COLOR;
 };
 
 cbuffer Translation : register(b0)
 {
-	float4 translate;
+	float4x4 worldMat;
+	float4x4 viewprojMat;
+	//float4 translate;
 	float4 color;
 };
 
 float4 PS_main( VSOut input ) : SV_TARGET0
 {
-	return color;
+	float4 output = float4(input.normal.xyz,1.0f);
+
+//	return color;
+	return output;
 }
