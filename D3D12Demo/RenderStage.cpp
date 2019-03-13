@@ -74,7 +74,7 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 	gpsd.SampleMask = UINT_MAX;
 
 	//Specify rasterizer behaviour.
-	gpsd.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+	gpsd.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
 	gpsd.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
 
 	//Specify blend descriptions.

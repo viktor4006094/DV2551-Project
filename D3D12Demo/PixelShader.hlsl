@@ -15,8 +15,8 @@ cbuffer Translation : register(b0)
 
 float4 PS_main( VSOut input ) : SV_TARGET0
 {
-	float4 output = float4(input.normal.xyz,1.0f);
+	float4 output = mul(float4(input.normal.xyz,0.0f),mul(worldMat,viewprojMat));
 
-//	return color;
+	//return color;
 	return output;
 }
