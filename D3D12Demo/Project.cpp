@@ -345,6 +345,10 @@ void Project::CreateTriangleData()
 	D3D12_RANGE range = { 0, 0 }; //We do not intend to read this resource on the CPU.
 	gVertexBufferResource->Map(0, &range, &dataBegin);
 	memcpy(dataBegin, triangleVertices, sizeof(triangleVertices));
+	if (testVertex.a == 0.0f) {
+		int fdja = 23;
+	}
+	
 	gVertexBufferResource->Unmap(0, nullptr);
 
 	//Initialize vertex buffer view, used in the render call.

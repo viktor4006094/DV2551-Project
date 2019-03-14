@@ -251,9 +251,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ComputeStage.hpp" />
+    <ClInclude Include="DragonTriangles.h" />
     <ClInclude Include="GameStateHandler.hpp" />
     <ClInclude Include="GPUStage.hpp" />
-    <ClInclude Include="DragonTriangles.h" />
     <ClInclude Include="RenderStage.hpp" />
     <ClInclude Include="StructsAndEnums.hpp" />
     <ClInclude Include="ConstantsAndGlobals.hpp" />

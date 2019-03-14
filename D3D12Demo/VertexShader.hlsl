@@ -1,7 +1,7 @@
 struct VSIn
 {
 	float4 pos		: POSITION;
-	float4 normal	:NORMAL;
+	float4 nor	: NOR;
 	//float3 color	: COLOR;
 };
 
@@ -37,7 +37,14 @@ VSOut VS_main( VSIn input, uint index : SV_VertexID )
 	output.color = color;// test;
 
 	output.pos = mul(input.pos,mul(worldMat,viewprojMat));
-	output.normal = input.normal;
+
+
+	output.normal = input.nor;
+
+	//if (input.nor.z == 0.0) {
+	//	output.normal.z = 1.0;
+	//}
+
 	//output.pos = input.pos +translate;
 	//output.pos.z += 0.55; // move them backwards so that they're in front of the camera
 	return output;
