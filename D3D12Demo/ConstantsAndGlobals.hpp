@@ -36,6 +36,8 @@ const unsigned int NUM_SWAP_BUFFERS = 3; //Number of buffers
 static std::mutex gThreadIDIndexLock;
 static std::mutex gBufferTransferLock;
 
+static std::mutex gPresentLock;
+
 
 #ifdef VETTIG_DATOR
 typedef ID3D12Device5* D3D12DevPtr;

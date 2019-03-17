@@ -146,8 +146,13 @@ void ComputeStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 	//Close the list to prepare it for execution.
 	computeList->Close();
 
-	//wait for current frame to finish rendering before using it in the compute pass
-	//p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+
+
+	// Wait for the geometry stage to be finished
+	if (p->gThreadFences[threadIndex]->GetCompletedValue() < p->gThreadFenceValues[threadIndex]) {
+		p->gThreadFences[threadIndex]->SetEventOnCompletion(p->gThreadFenceValues[threadIndex], p->gThreadFenceEvents[threadIndex]);
+		WaitForSingleObject(p->gThreadFenceEvents[threadIndex], INFINITE);
+	}
 
 
 	//Execute the command list.

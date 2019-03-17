@@ -80,16 +80,16 @@ public:
 	ID3D12Fence1* gThreadFences[NUM_THREADS] = { nullptr };
 
 
-	UINT64 gSwapBufferFenceValues[NUM_SWAP_BUFFERS] = { 0 };
-	//UINT64 gSwapBufferWaitValues[NUM_SWAP_BUFFERS] = { 0 };
-	HANDLE gSwapBufferFenceEvents[NUM_SWAP_BUFFERS] = { nullptr };
-	ID3D12Fence1* gSwapBufferFences[NUM_SWAP_BUFFERS] = { nullptr };
+	//UINT64 gSwapBufferFenceValues[NUM_SWAP_BUFFERS] = { 0 };
+	////UINT64 gSwapBufferWaitValues[NUM_SWAP_BUFFERS] = { 0 };
+	//HANDLE gSwapBufferFenceEvents[NUM_SWAP_BUFFERS] = { nullptr };
+	//ID3D12Fence1* gSwapBufferFences[NUM_SWAP_BUFFERS] = { nullptr };
 
 
 	//backbuffer
-	UINT64 gBackBufferFenceValue = 0;
-	HANDLE gBackBufferFenceEvent[NUM_SWAP_BUFFERS] = {nullptr};
-	ID3D12Fence1* gBackBufferFence = nullptr;
+	//UINT64 gBackBufferFenceValue = 0;
+	//HANDLE gBackBufferFenceEvent[NUM_SWAP_BUFFERS] = {nullptr};
+	//ID3D12Fence1* gBackBufferFence = nullptr;
 
 
 	D3D12DevPtr gDevice5 = nullptr; // ID3D12Device

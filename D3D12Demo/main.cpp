@@ -6,18 +6,6 @@
 // 181009: Stefan Petersson, cleanups/updates DXGI 1.6
 //--------------------------------------------------------------------------------------
 
-/* 
-//! Per-frame order of execution
-
-1. Render scene to a RTV texture that's not in the swapchain
-
-2. Use that texture as a SRV in the FXAA compute shader and write to a UAV
-
-3. Copy resource from the UAV to the backbuffer, no passthrough-pass needed
-   See line 890 in the Ray-Tracing example for how this is done
-*/
-
-
 
 #include "main.hpp"
 
