@@ -22,12 +22,12 @@ VSOut VS_main( VSIn input, uint index : SV_VertexID )
 
 	float4 test = { 0.5, 0.5, 0.5, 0.5 };
 
-	//// for stress testing ////
+	//// for stress testing and stability reasons ////
 	//! increasing i by too much will hang the GPU, try to avoid doing that
-	//for (int i = 0; i < 4000000; i++) {
-	//	test.x = sin(i);
-	//	test.y = test.x + cos(i*i);
-	//}
+	for (int i = 0; i < 4000000; i++) {
+		test.x = sin(i);
+		test.y = test.x + cos(i*i);
+	}
 	//// End for stress testing ////
 
 	output.color = test;

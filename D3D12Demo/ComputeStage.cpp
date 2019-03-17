@@ -121,8 +121,8 @@ void ComputeStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 
 
 
-	static const UINT squaresWide = SCREEN_WIDTH / 40U;
-	static const UINT squaresHigh = SCREEN_HEIGHT / 20U;
+	static const UINT squaresWide = SCREEN_WIDTH / 32U + 1;
+	static const UINT squaresHigh = SCREEN_HEIGHT / 32U + 1;
 
 	computeList->Dispatch(squaresWide, squaresHigh, 1);
 

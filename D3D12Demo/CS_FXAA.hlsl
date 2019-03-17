@@ -13,6 +13,7 @@ Texture2D<float4>   inputTex	: register(t0);
 RWTexture2D<float4> outputTex	: register(u0);
 SamplerState samp				: register(s0);
 
+
 //Used for syntax highlighting
 #if defined(__INTELLISENSE__)
 #define TEXTURE_WIDTH	1.0f
@@ -22,11 +23,14 @@ SamplerState samp				: register(s0);
 
 #ifdef TEXTURE_WIDTH
 #ifdef TEXTURE_HEIGHT
+groupshared float2 screenSize = float2(TEXTURE_WIDTH, TEXTURE_HEIGHT);
 groupshared float2 inverseScreenSize = float2((1.0 / TEXTURE_WIDTH), (1.0 / TEXTURE_HEIGHT));
 #else
+groupshared float2 screenSize = float2(1.0, 1.0);
 groupshared float2 inverseScreenSize = float2(-1.0, -1.0);
 #endif
 #else
+groupshared float2 screenSize = float2(1.0, 1.0);
 groupshared float2 inverseScreenSize = float2(-1.0, -1.0);
 #endif
 
@@ -46,8 +50,7 @@ float rgb2luma(float3 rgb)
 
 
 
-// todo? change numthreads to a multiple of 32 and add an early exit for threads outside of the texture
-[numthreads(40, 20, 1)]
+[numthreads(32, 32, 1)]
 void FXAA_main(
 	uint3	dispaThreadID	: SV_DispatchThreadID,	// Global position
 	uint3	groupThreadID : SV_GroupThreadID,		// Group position
@@ -61,6 +64,16 @@ void FXAA_main(
 	float2 screen_pos = dispaThreadID.xy;
 
 	GroupMemoryBarrierWithGroupSync();
+	
+	// Early exit for threads outside of the texture
+	if (screen_pos.x >= screenSize.x || screen_pos.y >= screenSize.y) {
+		//outputTex[screen_pos] = float4(1.0f, 1.0f, 0.0f, 1.0f);
+		return;
+	} 
+	//else {
+	//	outputTex[screen_pos] = float4(1.0f, 0.0f, 0.0f, 1.0f);
+	//	return;
+	//}
 
 	float3 colorCenter = inputTex.SampleLevel(samp, orig_uv, 0.0).rgb;
 	float3 testCenter = inputTex[screen_pos].rgb;

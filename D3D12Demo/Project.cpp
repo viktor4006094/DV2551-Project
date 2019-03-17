@@ -760,10 +760,15 @@ void Project::Render(int id)
 	thread_local UINT64 backBufferFenceSignalValue;
 	//static int testCounter = 0;
 
+	WaitForSingleObjectEx(gSwapChainWaitableObject, 1000, true);
+
+
 	//get the thread index
 	gThreadIDIndexLock.lock();
 	CountFPS(mWndHandle);
 	
+	// Wait for the swap chain so that no more than MAX_FRAME_LATENCY frames are being processed simultaneously
+	// See MAX_FRAME_LATENCY in ConstantsAndGlobals.hpp for the specified amount
 	swapBufferIndex = lastRenderIterationSwapBufferIndex;
 	lastRenderIterationSwapBufferIndex = (++lastRenderIterationSwapBufferIndex) % NUM_SWAP_BUFFERS;
 
@@ -780,9 +785,6 @@ void Project::Render(int id)
 		PerFrameResources* perFrame = &gPerFrameResources[swapBufferIndex];
 		PerThreadFenceHandle* perThread = &gPerThreadFenceHandles[threadIndex];
 
-		// Wait for the swap chain so that no more than MAX_FRAME_LATENCY frames are being processed simultaneously
-		// See MAX_FRAME_LATENCY in ConstantsAndGlobals.hpp for the specified amount
-		WaitForSingleObjectEx(gSwapChainWaitableObject, 1000, true);
 
 		// Render the geometry
 		GPUStages[0]->Run(swapBufferIndex, threadIndex, this);
@@ -791,8 +793,11 @@ void Project::Render(int id)
 		// Wait for the render stage to finish
 		UINT64 threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
 		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
-		gThreadFences[threadIndex]->SetEventOnCompletion(threadFenceValue, gThreadFenceEvents[threadIndex]);
-		WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
+
+		if (gThreadFences[threadIndex]->GetCompletedValue() < threadFenceValue) {
+			gThreadFences[threadIndex]->SetEventOnCompletion(threadFenceValue, gThreadFenceEvents[threadIndex]);
+			WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
+		}
 		
 		// Begin the rendering of the next frame once the first part of this frame is done.
 		gThreadPool->push([this](int id) {Render(id); });
@@ -804,8 +809,11 @@ void Project::Render(int id)
 		// Wait for the compute stage to finish executing
 		threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
 		gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
-		gThreadFences[threadIndex]->SetEventOnCompletion(threadFenceValue, gThreadFenceEvents[threadIndex]);
-		WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
+		if (gThreadFences[threadIndex]->GetCompletedValue() < threadFenceValue) {
+			gThreadFences[threadIndex]->SetEventOnCompletion(threadFenceValue, gThreadFenceEvents[threadIndex]);
+			WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
+		}
+
 
 	
 		// Copy the result of the FXAA compute shader to the back buffer
