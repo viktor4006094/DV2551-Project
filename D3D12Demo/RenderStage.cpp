@@ -46,7 +46,8 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 	);
 
 	D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0,	D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{"NOR",0,DXGI_FORMAT_R32G32B32A32_FLOAT,1,D3D12_APPEND_ALIGNED_ELEMENT,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0}
 	};
 
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc;
@@ -75,6 +76,16 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 	//Specify rasterizer behaviour.
 	gpsd.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
 	gpsd.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
+
+	// specify depth stencil state
+
+	D3D12_DEPTH_STENCIL_DESC dsd = {};
+	dsd.DepthEnable = TRUE;
+	dsd.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	dsd.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+
+	gpsd.DepthStencilState = dsd;
+	gpsd.DSVFormat = DXGI_FORMAT_D32_FLOAT;
 
 	//Specify blend descriptions.
 	D3D12_RENDER_TARGET_BLEND_DESC defaultRTdesc = {
@@ -113,12 +124,6 @@ void RenderStage::Run(int index, Project* p)
 	directAllocator->Reset();
 	directList->Reset(directAllocator, mPipelineState);
 
-	//Set root signature
-	directList->SetGraphicsRootSignature(p->gRootSignature);
-
-	//Set necessary states.
-	directList->RSSetViewports(1, &p->gViewport);
-	directList->RSSetScissorRects(1, &p->gScissorRect);
 
 
 	// Indicate that the intermediate buffer will be used as a render target
@@ -133,14 +138,31 @@ void RenderStage::Run(int index, Project* p)
 	D3D12_CPU_DESCRIPTOR_HANDLE cdh = p->gIntermediateRenderTargetsDescHeap->GetCPUDescriptorHandleForHeapStart();
 	cdh.ptr += p->gRenderTargetDescriptorSize * backBufferIndex;
 
+	// get a handle to the depth/stencil buffer
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvh = p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	directList->ClearDepthStencilView(p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-	directList->OMSetRenderTargets(1, &cdh, true, nullptr);
-
+	// set and clear render targets and depth stencil
+	float clearColor[4] = { 0.0f,0.0f,0.0f,1.0f };
+	directList->OMSetRenderTargets(1, &cdh, false, &dsvh);
+	//directList->ClearRenderTargetView(cdh,clearColor, 0, nullptr);
+	//directList->OMSetRenderTargets(1, &cdh, true, nullptr);
 	directList->ClearRenderTargetView(cdh, gClearColor, 0, nullptr);
 
 
+
+
+	//Set root signature
+	directList->SetGraphicsRootSignature(p->gRootSignature);
+
+	//Set necessary states.
+	directList->RSSetViewports(1, &p->gViewport);
+	directList->RSSetScissorRects(1, &p->gScissorRect);
+
+
+
 	directList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	directList->IASetVertexBuffers(0, 1, &p->gVertexBufferView);
+	directList->IASetVertexBuffers(0, 2, p->gVertexBufferView);
 
 	//get the current game state
 
@@ -168,7 +190,7 @@ void RenderStage::Run(int index, Project* p)
 		//directList->SetGraphicsRootDescriptorTable(4, gdh);
 		//gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-		directList->DrawInstanced(3, 1, 0, 0);
+		directList->DrawInstanced(300000, 1, 0, 0);
 	}
 
 	// set state to common since this is used in by the compute queue as well

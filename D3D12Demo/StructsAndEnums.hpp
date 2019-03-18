@@ -2,7 +2,8 @@
 
 #include <d3d12.h>
 #include "ConstantsAndGlobals.hpp"
-
+#include <DirectXMath.h>
+#include <d3dtypes.h>
 #include <string>
 
 template<class Interface>
@@ -66,8 +67,21 @@ enum QueueType : size_t {
 
 struct Vertex
 {
+	//float a, s, d, f, g, h, j, k;
 	float x, y, z, w; // Position
-	//float r,g,b; // Color
+	//float a, b, c, d;//normal
+	////float r,g,b; // Color
+
+	//Vertex(float _x, float _y, float _z, float _w, float _a, float _b, float _c, float _d) {
+	//	x = _x;
+	//	y = _y;
+	//	z = _z;
+	//	w = _w;
+	//	a = _a;
+	//	b = _b;
+	//	c = _c;
+	//	d = _d;
+	//}
 };
 
 struct float4
@@ -77,7 +91,9 @@ struct float4
 
 
 struct alignas(256) CONSTANT_BUFFER_DATA {
-	float4 position;
+	DirectX::XMFLOAT4X4 world;
+	DirectX::XMFLOAT4X4 viewProj;
+	//float4 position;
 	float4 color;
 };
 

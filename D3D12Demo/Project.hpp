@@ -8,6 +8,7 @@
 #include <dxgi1_6.h> //Only used for initialization of the device and swap chain.
 #include <d3dcompiler.h>
 
+
 #include <vector>
 
 #include "..\extLib\ctpl_stl.h"
@@ -94,7 +95,8 @@ public:
 	ID3D12RootSignature*		gRootSignature = nullptr;
 
 	ID3D12Resource1*			gVertexBufferResource = nullptr;
-	D3D12_VERTEX_BUFFER_VIEW	gVertexBufferView = {};
+	ID3D12Resource1*			gVertexBufferNormalResource = nullptr;
+	D3D12_VERTEX_BUFFER_VIEW	gVertexBufferView[2] = {};
 
 
 	// Constant buffers
@@ -106,6 +108,10 @@ public:
 		float position[4];
 		float color[4];
 	}cbData[TOTAL_TRIS], *pMappedCB[3];*/
+
+	// Depth Stencil
+	ID3D12Resource*				depthStencilBuffer = nullptr;
+	ID3D12DescriptorHeap*		dsDescriptorHeap = nullptr;
 
 
 	UINT mLatestBackBufferIndex = 0;

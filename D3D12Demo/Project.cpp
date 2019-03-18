@@ -1,7 +1,7 @@
 #include "Project.hpp"
 #include "RenderStage.hpp"
 #include "ComputeStage.hpp"
-
+#include "DragonTriangles.h"
 #include <chrono>
 #include <ctime>
 #include <string>
@@ -105,7 +105,8 @@ void Project::Shutdown()
 
 	SafeRelease(&gRootSignature);
 	//SafeRelease(&gRenderPipeLineState);
-
+	SafeRelease(&depthStencilBuffer);
+	SafeRelease(&dsDescriptorHeap);
 	SafeRelease(&gVertexBufferResource);
 }
 
@@ -240,6 +241,56 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 		}
 	}
 
+	#pragma region depthStencil
+	// depth stencil
+	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
+	dsvHeapDesc.NumDescriptors = 1;
+	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	hr = gDevice5->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&dsDescriptorHeap));
+
+
+	D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilDesc = {};
+	depthStencilDesc.Format = DXGI_FORMAT_D32_FLOAT;
+	depthStencilDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+	depthStencilDesc.Flags = D3D12_DSV_FLAG_NONE;
+
+	D3D12_CLEAR_VALUE depthOptimizedClearValue = {};
+	depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
+	depthOptimizedClearValue.DepthStencil.Depth = 1.0f;
+	depthOptimizedClearValue.DepthStencil.Stencil = 0;
+
+
+
+	D3D12_HEAP_PROPERTIES hp = {};
+	hp.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+	D3D12_RESOURCE_DESC rd = {};
+	rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	rd.Width = SCREEN_WIDTH;
+	rd.Height = SCREEN_HEIGHT;
+	rd.DepthOrArraySize = 1;
+	rd.MipLevels = 1;
+	rd.SampleDesc.Count = 1;
+	rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	rd.Format = DXGI_FORMAT_D32_FLOAT;
+	rd.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL | D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
+
+
+	//Creates both a resource and an implicit heap, such that the heap is big enough
+	//to contain the entire resource and the resource is mapped to the heap. 
+	hr = gDevice5->CreateCommittedResource(
+		&hp,
+		D3D12_HEAP_FLAG_NONE,
+		&rd,
+		D3D12_RESOURCE_STATE_DEPTH_WRITE,
+		&depthOptimizedClearValue,
+		IID_PPV_ARGS(&depthStencilBuffer));
+
+
+	gDevice5->CreateDepthStencilView(depthStencilBuffer, &depthStencilDesc, dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	#pragma endregion
+
 	SafeRelease(&factory);
 }
 
@@ -298,12 +349,17 @@ void Project::CreateShadersAndPipelineStates()
 
 void Project::CreateTriangleData()
 {
-	Vertex triangleVertices[3] =
-	{
-		{ 0.0f,  0.05f, 0.0f, 1.0f },
-		{ 0.05f, -0.05f, 0.0f, 1.0f },
-		{ -0.05f, -0.05f, 0.0f, 1.0f }
-	};
+	//Vertex triangleVertices[6] =
+	//{	
+	//	{ -0.05f, -0.05f, 0.0f, 1.0f },
+	//	{-0.05f,0.05f,0.0f,1.0f},
+	//	{0.05f,-0.05f,0.0f,1.0f},
+
+	//	{-0.05f,0.05f,0.0f,1.0f},
+	//	{0.05f,0.05f,0.0f,1.0f},
+	//	{ 0.05f, -0.05f, 0.0f, 1.0f }
+
+	//};
 
 	//Note: using upload heaps to transfer static data like vert buffers is not 
 	//recommended. Every time the GPU needs it, the upload heap will be marshalled 
@@ -340,12 +396,37 @@ void Project::CreateTriangleData()
 	D3D12_RANGE range = { 0, 0 }; //We do not intend to read this resource on the CPU.
 	gVertexBufferResource->Map(0, &range, &dataBegin);
 	memcpy(dataBegin, triangleVertices, sizeof(triangleVertices));
+
+	
 	gVertexBufferResource->Unmap(0, nullptr);
+	
+
+	gDevice5->CreateCommittedResource(
+		&hp,
+		D3D12_HEAP_FLAG_NONE,
+		&rd,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&gVertexBufferNormalResource));
+
+	gVertexBufferNormalResource->SetName(L"vbn heap");
+
+	//Copy the triangle data to the vertex buffer.
+	dataBegin = nullptr;
+	range = { 0, 0 }; //We do not intend to read this resource on the CPU.
+	gVertexBufferNormalResource->Map(0, &range, &dataBegin);
+	memcpy(dataBegin, normalVertices, sizeof(normalVertices));
+
+	
+	gVertexBufferNormalResource->Unmap(0, nullptr);
 
 	//Initialize vertex buffer view, used in the render call.
-	gVertexBufferView.BufferLocation = gVertexBufferResource->GetGPUVirtualAddress();
-	gVertexBufferView.StrideInBytes  = sizeof(Vertex);
-	gVertexBufferView.SizeInBytes    = sizeof(triangleVertices);
+	gVertexBufferView[0].BufferLocation = gVertexBufferResource->GetGPUVirtualAddress();
+	gVertexBufferView[0].StrideInBytes  = sizeof(Vertex);
+	gVertexBufferView[0].SizeInBytes    = sizeof(triangleVertices);
+	gVertexBufferView[1].BufferLocation = gVertexBufferNormalResource->GetGPUVirtualAddress();
+	gVertexBufferView[1].StrideInBytes = sizeof(Vertex);
+	gVertexBufferView[1].SizeInBytes = sizeof(normalVertices);
 }
 
 // todo remove unused root parameters and tables
