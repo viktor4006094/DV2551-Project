@@ -77,6 +77,16 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 	gpsd.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
 	gpsd.RasterizerState.CullMode = D3D12_CULL_MODE_BACK;
 
+	// specify depth stencil state
+
+	D3D12_DEPTH_STENCIL_DESC dsd = {};
+	dsd.DepthEnable = TRUE;
+	dsd.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	dsd.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+
+	gpsd.DepthStencilState = dsd;
+	gpsd.DSVFormat = DXGI_FORMAT_D32_FLOAT;
+
 	//Specify blend descriptions.
 	D3D12_RENDER_TARGET_BLEND_DESC defaultRTdesc = {
 		false, false,
@@ -114,12 +124,6 @@ void RenderStage::Run(int index, Project* p)
 	directAllocator->Reset();
 	directList->Reset(directAllocator, mPipelineState);
 
-	//Set root signature
-	directList->SetGraphicsRootSignature(p->gRootSignature);
-
-	//Set necessary states.
-	directList->RSSetViewports(1, &p->gViewport);
-	directList->RSSetScissorRects(1, &p->gScissorRect);
 
 
 	// Indicate that the intermediate buffer will be used as a render target
@@ -134,10 +138,27 @@ void RenderStage::Run(int index, Project* p)
 	D3D12_CPU_DESCRIPTOR_HANDLE cdh = p->gIntermediateRenderTargetsDescHeap->GetCPUDescriptorHandleForHeapStart();
 	cdh.ptr += p->gRenderTargetDescriptorSize * backBufferIndex;
 
+	// get a handle to the depth/stencil buffer
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvh = p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	directList->ClearDepthStencilView(p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
-	directList->OMSetRenderTargets(1, &cdh, true, nullptr);
-
+	// set and clear render targets and depth stencil
+	float clearColor[4] = { 0.0f,0.0f,0.0f,1.0f };
+	directList->OMSetRenderTargets(1, &cdh, false, &dsvh);
+	//directList->ClearRenderTargetView(cdh,clearColor, 0, nullptr);
+	//directList->OMSetRenderTargets(1, &cdh, true, nullptr);
 	directList->ClearRenderTargetView(cdh, gClearColor, 0, nullptr);
+
+
+
+
+	//Set root signature
+	directList->SetGraphicsRootSignature(p->gRootSignature);
+
+	//Set necessary states.
+	directList->RSSetViewports(1, &p->gViewport);
+	directList->RSSetScissorRects(1, &p->gScissorRect);
+
 
 
 	directList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

@@ -32,7 +32,7 @@ void GameStateHandler::CreateMeshes()
 		float c = 1.0f - fade * i;
 		cbData[i].color = float4{ c, c, c, 1.0 };
 
-		DirectX::XMStoreFloat4x4(&cbData[i].world, DirectX::XMMatrixTranspose(DirectX::XMMatrixScaling(2,2,2)* DirectX::XMMatrixTranslation(0,0,0.0f)));
+		DirectX::XMStoreFloat4x4(&cbData[i].world, DirectX::XMMatrixTranspose(DirectX::XMMatrixScaling(2,2,2)* DirectX::XMMatrixTranslation((i%2)*40-20,0, (i / 2)*40-20)));
 		//cbData[i].world = DirectX::XMFLOAT4X4{ 0,0,0,0,0,0,0,0,0,0,0,0,i % 100,0,i / 100,1 };//DirectX::XMMatrixTranslation((i % 100), 0, (i / 40));
 		//writeState.meshes.push_back(m);
 	}

@@ -18,8 +18,8 @@ public:
 	//GameState* getReadOnlyStateAtIndex(int index);
 
 	bool isRunning = true;
-	DirectX::XMMATRIX projMat = DirectX::XMMatrixPerspectiveFovLH(45.0f*(3.14f / 180.0f), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 1000.0f);
-	DirectX::XMMATRIX viewMat = DirectX::XMMatrixLookAtLH({-10, 2, -100 }, { 0, 0, 0 }, {0,1,0});
+	DirectX::XMMATRIX projMat = DirectX::XMMatrixPerspectiveFovLH(109.0f*(3.14f / 180.0f), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 1000.0f);
+	DirectX::XMMATRIX viewMat = DirectX::XMMatrixLookAtLH({-10, 50, -100 }, { 0, 0, 0 }, {0,1,0});
 	CONSTANT_BUFFER_DATA cbData[TOTAL_TRIS];
 	CONSTANT_BUFFER_DATA *pMappedCB[NUM_SWAP_BUFFERS];
 private:

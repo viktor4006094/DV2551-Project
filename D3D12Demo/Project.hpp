@@ -109,6 +109,10 @@ public:
 		float color[4];
 	}cbData[TOTAL_TRIS], *pMappedCB[3];*/
 
+	// Depth Stencil
+	ID3D12Resource*				depthStencilBuffer = nullptr;
+	ID3D12DescriptorHeap*		dsDescriptorHeap = nullptr;
+
 
 	UINT mLatestBackBufferIndex = 0;
 
