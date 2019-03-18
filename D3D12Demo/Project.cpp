@@ -6,7 +6,7 @@
 #include <ctime>
 #include <string>
 
-
+#include <iostream>
 
 #include <functional>
 
@@ -87,6 +87,10 @@ void Project::Init(HWND wndHandle)
 	gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->SetName(L"ComputeQueue");
 #endif
 
+
+	gpuTimer[0].init(gDevice5, 100);
+	gpuTimer[1].init(gDevice5, 100);
+	gpuTimer[2].init(gDevice5, 100);
 
 	WaitForGpu(QUEUE_TYPE_DIRECT);
 }
@@ -706,6 +710,8 @@ void Project::CreateConstantBufferResources()
 
 void Project::CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex)
 {
+	static UINT64 frameCount = 0;
+
 	UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 	
 	PerFrameResources* perFrame = &gPerFrameResources[swapBufferIndex];
@@ -718,6 +724,9 @@ void Project::CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex
 
 	directAllocator->Reset();
 	directList->Reset(directAllocator, nullptr);
+
+	// timer start
+	gpuTimer[2].start(directList, frameCount);
 
 	SetResourceTransitionBarrier(directList, perFrame->gUAVResource,
 		D3D12_RESOURCE_STATE_COMMON,
@@ -739,6 +748,9 @@ void Project::CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex
 		D3D12_RESOURCE_STATE_PRESENT
 	);
 
+	gpuTimer[2].stop(directList, frameCount);
+
+	gpuTimer[2].resolveQueryToCPU(directList, frameCount);
 
 	//Close the list to prepare it for execution.
 	directList->Close();
@@ -753,6 +765,8 @@ void Project::CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute2[] = { directList };
 	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
+
+	frameCount++;
 }
 
 void Project::Render(int id)
@@ -787,64 +801,108 @@ void Project::Render(int id)
 
 	gThreadIDIndexLock.unlock();
 
-	if (isRunning) {
+	
+	if (frameCounter < NUM_TIMESTAMP_PAIRS) {
 
-		// Update the index used by the CPU update loop
-		mLatestBackBufferIndex = swapBufferIndex;
+		if (isRunning) {
 
-		PerFrameResources* perFrame = &gPerFrameResources[swapBufferIndex];
-		PerThreadFenceHandle* perThread = &gPerThreadFenceHandles[threadIndex];
+			// Update the index used by the CPU update loop
+			mLatestBackBufferIndex = swapBufferIndex;
 
-
-		////////// Render geometry section //////////
-
-		// Render the geometry
-		GPUStages[0]->Run(swapBufferIndex, threadIndex, this);
-
-		// Signal that the geometry stage is finished
-		UINT64 threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
-		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
-
-		// Begin the rendering of the next frame once the first part of this frame is done.
-		gThreadPool->push([this](int id) {Render(id); });
+			PerFrameResources* perFrame = &gPerFrameResources[swapBufferIndex];
+			PerThreadFenceHandle* perThread = &gPerThreadFenceHandles[threadIndex];
 
 
+			////////// Render geometry section //////////
 
-		////////// FXAA section //////////
+			// Render the geometry
+			GPUStages[0]->Run(swapBufferIndex, threadIndex, this);
 
-		// Apply FXAA to the rendered image with a compute shader
-		GPUStages[1]->Run(swapBufferIndex, threadIndex, this);
+			// Signal that the geometry stage is finished
+			UINT64 threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
+			gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
 
-		// Signal that the FXAA stage is finished
-		threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
-		gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
+			// Begin the rendering of the next frame once the first part of this frame is done.
+			gThreadPool->push([this](int id) {Render(id); });
 
 
 
-		////////// Present section //////////
+			////////// FXAA section //////////
 
-		// Wait for the previous frame to have been presented
-		if (gBackBufferFence->GetCompletedValue() < frameIndex) {
-			gBackBufferFence->SetEventOnCompletion(frameIndex, gBackBufferFenceEvent[swapBufferIndex]);
-			WaitForSingleObject(gBackBufferFenceEvent[swapBufferIndex], INFINITE);
+			// Apply FXAA to the rendered image with a compute shader
+			GPUStages[1]->Run(swapBufferIndex, threadIndex, this);
+
+			// Signal that the FXAA stage is finished
+			threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
+			gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
+
+
+
+			////////// Present section //////////
+
+			// Wait for the previous frame to have been presented
+			if (gBackBufferFence->GetCompletedValue() < frameIndex) {
+				gBackBufferFence->SetEventOnCompletion(frameIndex, gBackBufferFenceEvent[swapBufferIndex]);
+				WaitForSingleObject(gBackBufferFenceEvent[swapBufferIndex], INFINITE);
+			}
+
+			// Lock this section since if Present is called in another thread whilst in this section the backbufferIndex 
+			// used in CopyComputeOutputToBackBuffer() becomes invalid and the application crashes
+			gPresentLock.lock();
+
+			// Copy the result of the FXAA compute shader to the back buffer
+			CopyComputeOutputToBackBuffer(swapBufferIndex, threadIndex);
+
+			// Signal that the frame with frameIndex+1 can enter the present section after this one is done
+			gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gBackBufferFence, frameIndex + 1);
+
+			// Present the frame.
+			DXGI_PRESENT_PARAMETERS pp = {};
+			gSwapChain4->Present1(0, DXGI_PRESENT_ALLOW_TEARING, &pp);
+
+			gPresentLock.unlock();
+
+
 		}
 
-		// Lock this section since if Present is called in another thread whilst in this section the backbufferIndex 
-		// used in CopyComputeOutputToBackBuffer() becomes invalid and the application crashes
-		gPresentLock.lock();
+	} else {
+		UINT64 directQueueFreq;
+		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->GetTimestampFrequency(&directQueueFreq);
+		double timestampToMs = (1.0 / directQueueFreq) * 1'000.0;
 
-		// Copy the result of the FXAA compute shader to the back buffer
-		CopyComputeOutputToBackBuffer(swapBufferIndex, threadIndex);
 
-		// Signal that the frame with frameIndex+1 can enter the present section after this one is done
-		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gBackBufferFence, frameIndex+1);
+		UINT64 firstTimestamp = gpuTimer[0].getTimestampPair(0).Start;
 
-		// Present the frame.
-		DXGI_PRESENT_PARAMETERS pp = {};
-		gSwapChain4->Present1(0, DXGI_PRESENT_ALLOW_TEARING, &pp);
+		// save timestamps to file
+		for (int i = 0; i < NUM_TIMESTAMP_PAIRS; ++i) {
+			D3D12::GPUTimestampPair timePair = gpuTimer[0].getTimestampPair(i);
 
-		gPresentLock.unlock();
+			char buffer[100];
+			sprintf_s(buffer, "%d : Geomtery start: %.6f\n", i, ((timePair.Start - firstTimestamp) * timestampToMs));
+			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "%d : Geomtery stop: %.6f\n", i, ((timePair.Stop - firstTimestamp) * timestampToMs));
+			OutputDebugStringA(buffer);
 
+			timePair = gpuTimer[1].getTimestampPair(i);
+
+			sprintf_s(buffer, "%d : FXAA start: %.6f\n", i, ((timePair.Start - firstTimestamp) * timestampToMs));
+			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "%d : FXAA stop: %.6f\n", i, ((timePair.Stop - firstTimestamp) * timestampToMs));
+			OutputDebugStringA(buffer);
+
+			timePair = gpuTimer[2].getTimestampPair(i);
+
+
+			sprintf_s(buffer, "%d : Present start: %.6f\n", i, ((timePair.Start - firstTimestamp) * timestampToMs));
+			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "%d : Present stop: %.6f\n\n\n", i, ((timePair.Stop - firstTimestamp) * timestampToMs));
+			OutputDebugStringA(buffer);
+
+			//std::string s1 = std::to_string(i) + " Geometry start: " + std::to_string(geometryTime.Start);
+			//std::cout << i << " Geometry stop:  " << geometryTime.Stop << std::endl << std::endl;
+
+			
+		}
 
 	}
 }

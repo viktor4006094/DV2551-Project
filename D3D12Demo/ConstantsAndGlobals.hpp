@@ -38,6 +38,7 @@ static std::mutex gBufferTransferLock;
 
 static std::mutex gPresentLock;
 
+const unsigned int NUM_TIMESTAMP_PAIRS = 100;
 
 #ifdef VETTIG_DATOR
 typedef ID3D12Device5* D3D12DevPtr;

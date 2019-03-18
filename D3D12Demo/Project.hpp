@@ -12,6 +12,8 @@
 
 #include "..\extLib\ctpl_stl.h"
 
+#include "D3D12Timer.h"
+
 #include "GPUStage.hpp"
 
 
@@ -140,6 +142,9 @@ public:
 	GameStateHandler mGameStateHandler;
 
 	HWND mWndHandle;
+
+	D3D12::D3D12Timer gpuTimer[3];
+
 
 	bool isRunning = true;
 private:

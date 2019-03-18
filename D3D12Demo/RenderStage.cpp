@@ -91,6 +91,8 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 void RenderStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 {
 	static size_t lastRenderIterationIndex = 0;
+	static UINT64 frameCount = 0;
+
 
 	//UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
 	//UINT backBufferIndex = index;
@@ -117,6 +119,9 @@ void RenderStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 
 	directAllocator->Reset();
 	directList->Reset(directAllocator, mPipelineState);
+
+	// timer start
+	p->gpuTimer[0].start(directList, frameCount);
 
 	//Set root signature
 	directList->SetGraphicsRootSignature(p->gRootSignature);
@@ -183,6 +188,11 @@ void RenderStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 	);
 
 
+	// timer end
+	p->gpuTimer[0].stop(directList, frameCount);
+
+	p->gpuTimer[0].resolveQueryToCPU(directList, frameCount);
+
 	//Close the list to prepare it for execution.
 	directList->Close();
 
@@ -193,5 +203,5 @@ void RenderStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 	ID3D12CommandList* listsToExecute[] = { directList };
 	p->gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
 
-
+	frameCount++;
 }

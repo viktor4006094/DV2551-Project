@@ -74,6 +74,8 @@ void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 
 void ComputeStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 {
+	static UINT64 frameCount = 0;
+
 	//UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
 	//UINT backBufferIndex = index;
 	
@@ -92,6 +94,9 @@ void ComputeStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 
 	computeAllocator->Reset();
 	computeList->Reset(computeAllocator, mPipelineState);
+
+	// timer start
+	p->gpuTimer[1].start(computeList, frameCount);
 
 	//Set root signature
 	computeList->SetComputeRootSignature(p->gRootSignature);
@@ -143,6 +148,11 @@ void ComputeStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 
 
 
+	// timer end
+	p->gpuTimer[1].stop(computeList, frameCount);
+
+	p->gpuTimer[1].resolveQueryToCPU(computeList, frameCount);
+
 	//Close the list to prepare it for execution.
 	computeList->Close();
 
@@ -158,4 +168,6 @@ void ComputeStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute2[] = { computeList };
 	p->gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
+
+	frameCount++;
 }
