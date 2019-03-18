@@ -86,10 +86,10 @@ public:
 	//ID3D12Fence1* gSwapBufferFences[NUM_SWAP_BUFFERS] = { nullptr };
 
 
-	//backbuffer
-	//UINT64 gBackBufferFenceValue = 0;
-	//HANDLE gBackBufferFenceEvent[NUM_SWAP_BUFFERS] = {nullptr};
-	//ID3D12Fence1* gBackBufferFence = nullptr;
+	// ensures that frames are presented in the correct order
+	UINT64 gBackBufferFenceValue = 0;
+	HANDLE gBackBufferFenceEvent[NUM_SWAP_BUFFERS] = {nullptr};
+	ID3D12Fence1* gBackBufferFence = nullptr;
 
 
 	D3D12DevPtr gDevice5 = nullptr; // ID3D12Device

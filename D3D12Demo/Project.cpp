@@ -49,17 +49,17 @@ void Project::Init(HWND wndHandle)
 		gDevice5->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gThreadFences[i]));
 	}
 
-	//for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
-	//	//gSwapBufferFenceValues[i] = 0;// NUM_SWAP_BUFFERS; //? 0
-	//	////gSwapBufferWaitValues[i] = 0;
-	//	//gSwapBufferFenceEvents[i] = CreateEvent(0, false, false, 0);
-	//	//gDevice5->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gSwapBufferFences[i]));
-	//
-	//	//
-	//	gBackBufferFenceEvent[i] = CreateEvent(0, false, false, 0);
-	//}
+	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
+		//gSwapBufferFenceValues[i] = 0;// NUM_SWAP_BUFFERS; //? 0
+		////gSwapBufferWaitValues[i] = 0;
+		//gSwapBufferFenceEvents[i] = CreateEvent(0, false, false, 0);
+		//gDevice5->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gSwapBufferFences[i]));
+	
+		//
+		gBackBufferFenceEvent[i] = CreateEvent(0, false, false, 0);
+	}
 
-	//gDevice5->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gBackBufferFence));
+	gDevice5->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gBackBufferFence));
 
 	// todo move elsewhere?
 #ifdef _DEBUG
@@ -761,16 +761,19 @@ void Project::Render(int id)
 	static int lastRenderIterationThreadIndex = 0;
 	thread_local int swapBufferIndex;
 	thread_local int threadIndex;
-	thread_local UINT64 backBufferFenceWaitValue;
-	thread_local UINT64 backBufferFenceSignalValue;
+	static UINT64 frameCounter = 0;
+	thread_local UINT64 frameIndex;
+	//thread_local UINT64 backBufferFenceSignalValue;
 	//static int testCounter = 0;
 
+
+	// get the value used to ensure that frames are presented in the correct order
+	frameIndex = frameCounter;
+	frameCounter++;
 
 	// Wait for the swap chain so that no more than MAX_FRAME_LATENCY frames are being processed simultaneously
 	// See MAX_FRAME_LATENCY in ConstantsAndGlobals.hpp for the specified amount
 	WaitForSingleObjectEx(gSwapChainWaitableObject, 1000, true);
-
-
 
 	//get the thread index
 	gThreadIDIndexLock.lock();
@@ -793,6 +796,8 @@ void Project::Render(int id)
 		PerThreadFenceHandle* perThread = &gPerThreadFenceHandles[threadIndex];
 
 
+		////////// Render geometry section //////////
+
 		// Render the geometry
 		GPUStages[0]->Run(swapBufferIndex, threadIndex, this);
 
@@ -800,9 +805,12 @@ void Project::Render(int id)
 		UINT64 threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
 		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
 
-		
 		// Begin the rendering of the next frame once the first part of this frame is done.
 		gThreadPool->push([this](int id) {Render(id); });
+
+
+
+		////////// FXAA section //////////
 
 		// Apply FXAA to the rendered image with a compute shader
 		GPUStages[1]->Run(swapBufferIndex, threadIndex, this);
@@ -812,6 +820,15 @@ void Project::Render(int id)
 		gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
 
 
+
+		////////// Present section //////////
+
+		// Wait for the previous frame to have been presented
+		if (gBackBufferFence->GetCompletedValue() < frameIndex) {
+			gBackBufferFence->SetEventOnCompletion(frameIndex, gBackBufferFenceEvent[swapBufferIndex]);
+			WaitForSingleObject(gBackBufferFenceEvent[swapBufferIndex], INFINITE);
+		}
+
 		// Lock this section since if Present is called in another thread whilst in this section the backbufferIndex 
 		// used in CopyComputeOutputToBackBuffer() becomes invalid and the application crashes
 		gPresentLock.lock();
@@ -819,10 +836,15 @@ void Project::Render(int id)
 		// Copy the result of the FXAA compute shader to the back buffer
 		CopyComputeOutputToBackBuffer(swapBufferIndex, threadIndex);
 
+		// Signal that the frame with frameIndex+1 can enter the present section after this one is done
+		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gBackBufferFence, frameIndex+1);
+
 		// Present the frame.
 		DXGI_PRESENT_PARAMETERS pp = {};
 		gSwapChain4->Present1(0, DXGI_PRESENT_ALLOW_TEARING, &pp);
 
 		gPresentLock.unlock();
+
+
 	}
 }
