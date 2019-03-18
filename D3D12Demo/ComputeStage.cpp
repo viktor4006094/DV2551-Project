@@ -95,9 +95,10 @@ void ComputeStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 	computeAllocator->Reset();
 	computeList->Reset(computeAllocator, mPipelineState);
 
+#ifdef RECORD_TIME
 	// timer start
 	p->gpuTimer[1].start(computeList, frameCount);
-
+#endif
 	//Set root signature
 	computeList->SetComputeRootSignature(p->gRootSignature);
 
@@ -147,11 +148,11 @@ void ComputeStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 	);
 
 
-
+#ifdef RECORD_TIME
 	// timer end
 	p->gpuTimer[1].stop(computeList, frameCount);
-
 	p->gpuTimer[1].resolveQueryToCPU(computeList, frameCount);
+#endif
 
 	//Close the list to prepare it for execution.
 	computeList->Close();

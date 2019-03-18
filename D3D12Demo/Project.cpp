@@ -725,8 +725,10 @@ void Project::CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex
 	directAllocator->Reset();
 	directList->Reset(directAllocator, nullptr);
 
+#ifdef RECORD_TIME
 	// timer start
 	gpuTimer[2].start(directList, frameCount);
+#endif
 
 	SetResourceTransitionBarrier(directList, perFrame->gUAVResource,
 		D3D12_RESOURCE_STATE_COMMON,
@@ -748,9 +750,10 @@ void Project::CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex
 		D3D12_RESOURCE_STATE_PRESENT
 	);
 
+#ifdef RECORD_TIME
 	gpuTimer[2].stop(directList, frameCount);
-
 	gpuTimer[2].resolveQueryToCPU(directList, frameCount);
+#endif
 
 	//Close the list to prepare it for execution.
 	directList->Close();
@@ -801,9 +804,9 @@ void Project::Render(int id)
 
 	gThreadIDIndexLock.unlock();
 
-	
+#ifdef RECORD_TIME
 	if (frameCounter < NUM_TIMESTAMP_PAIRS) {
-
+#endif
 		if (isRunning) {
 
 			// Update the index used by the CPU update loop
@@ -864,7 +867,7 @@ void Project::Render(int id)
 
 
 		}
-
+#ifdef RECORD_TIME
 	} else {
 		UINT64 directQueueFreq;
 		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->GetTimestampFrequency(&directQueueFreq);
@@ -905,4 +908,5 @@ void Project::Render(int id)
 		}
 
 	}
+#endif
 }

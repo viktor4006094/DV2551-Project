@@ -120,8 +120,10 @@ void RenderStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 	directAllocator->Reset();
 	directList->Reset(directAllocator, mPipelineState);
 
+#ifdef RECORD_TIME
 	// timer start
 	p->gpuTimer[0].start(directList, frameCount);
+#endif
 
 	//Set root signature
 	directList->SetGraphicsRootSignature(p->gRootSignature);
@@ -188,10 +190,11 @@ void RenderStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 	);
 
 
+#ifdef RECORD_TIME
 	// timer end
 	p->gpuTimer[0].stop(directList, frameCount);
-
 	p->gpuTimer[0].resolveQueryToCPU(directList, frameCount);
+#endif
 
 	//Close the list to prepare it for execution.
 	directList->Close();
