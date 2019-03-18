@@ -8,6 +8,11 @@
 #include <vector>
 
 //#define VETTIG_DATOR
+//#define RECORD_TIME
+
+const unsigned int NUM_THREADS = 10;
+
+const unsigned int MAX_FRAME_LATENCY = 2;
 
 // TOTAL_TRIS pretty much decides how many drawcalls in a brute force approach.
 constexpr int TOTAL_TRIS = 4;
@@ -25,13 +30,16 @@ const int SCREEN_HEIGHT = 2*480;	//Height of application.
 
 const FLOAT gClearColor[] = { 0.2f, 0.2f, 0.2f, 1.0f };
 
-const unsigned int MAX_PREPARED_FRAMES = 2; // number of frames that can be queued
+const unsigned int MAX_PREPARED_FRAMES = 3; // number of frames that can be queued
 const unsigned int NUM_SWAP_BUFFERS = 3; //Number of buffers
 
 
 static std::mutex gThreadIDIndexLock;
 static std::mutex gBufferTransferLock;
 
+static std::mutex gPresentLock;
+
+const unsigned int NUM_TIMESTAMP_PAIRS = 100;
 
 #ifdef VETTIG_DATOR
 typedef ID3D12Device5* D3D12DevPtr;

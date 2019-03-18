@@ -34,23 +34,39 @@ inline void SetResourceTransitionBarrier(
 }
 
 
+inline void SetUAVTransitionBarrier(
+	ID3D12GraphicsCommandList* commandList,
+	ID3D12Resource* resource)
+{
+	D3D12_RESOURCE_BARRIER barrierDesc = {};
+
+	barrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+	barrierDesc.UAV.pResource = resource;
+	//barrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	//barrierDesc.Transition.StateBefore = StateBefore;
+	//barrierDesc.Transition.StateAfter = StateAfter;
+
+	commandList->ResourceBarrier(1, &barrierDesc);
+}
+
 inline void CountFPS(HWND wndHandle)
 {
 	// FPS counter
 	static auto lastTime = std::chrono::high_resolution_clock::now();
-	static int frames = 0;
+	static UINT64 frames = 0;
 	auto currentTime = std::chrono::high_resolution_clock::now();
-	frames++;
+	InterlockedIncrement(&frames);
 
 	std::chrono::duration<double, std::milli> delta = currentTime - lastTime;
 	if (delta >= std::chrono::duration<double, std::milli>(250)) {
 		lastTime = std::chrono::high_resolution_clock::now();
-		int fps = frames * 4;
+		UINT64 fps = frames * 4;
 		std::string windowText = "FPS " + std::to_string(fps);
 		SetWindowTextA(wndHandle, windowText.c_str());
 		frames = 0;
 	}
 }
+
 
 
 
@@ -97,6 +113,114 @@ struct alignas(256) CONSTANT_BUFFER_DATA {
 	float4 color;
 };
 
+struct PerFrameResources
+{
+	ID3D12Resource1* gIntermediateRenderTarget = nullptr;
+	ID3D12Resource1* gUAVResource = nullptr;
+	//ID3D12Resource1* gSwapChainRenderTarget = nullptr;
+
+	ID3D12Fence1*	mIntraFrameFence		= nullptr;
+	HANDLE			mIntraEventHandle		= nullptr;
+	UINT64			mIntraFenceValue		= 0;
+	UINT64			mIntraWaitForValue		= 0;
+
+
+	ID3D12Fence1*	mPerFrameFence			= nullptr;
+	HANDLE			mPerFrameEventHandle	= nullptr;
+	UINT64			mPerFrameFenceValue		= 0;
+	UINT64			mPerFrameWaitForValue	= 0;
+
+
+	void CreateFenceAndEventHandle(D3D12DevPtr dev)
+	{
+		dev->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mIntraFrameFence));
+		mIntraFenceValue = 1;
+		//Create an event handle to use for GPU synchronization.
+		mIntraEventHandle = CreateEvent(0, false, false, 0);
+
+		dev->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mPerFrameFence));
+		mPerFrameFenceValue = 1;
+		//Create an event handle to use for GPU synchronization.
+		mPerFrameEventHandle = CreateEvent(0, false, false, 0);
+	}
+
+	void Release()
+	{
+		SafeRelease(&gIntermediateRenderTarget);
+		SafeRelease(&gUAVResource);
+		//SafeRelease(&gSwapChainRenderTarget);
+
+		CloseHandle(mIntraEventHandle);
+		SafeRelease(&mIntraFrameFence);
+		
+		CloseHandle(mPerFrameEventHandle);
+		SafeRelease(&mPerFrameFence);
+	}
+
+	void SignalIntraFrameFence(ID3D12CommandQueue* queue)
+	{
+		//Signal and increment the fence value.
+		const UINT64 fence = mIntraFenceValue;
+
+		mIntraWaitForValue = fence;
+
+		queue->Signal(mIntraFrameFence, fence);
+
+		InterlockedIncrement(&mIntraFenceValue);
+		//mIntraFenceValue++;
+	}
+
+	void WaitForIntraFrameEventCompletion()
+	{
+		//Wait until command queue is done.
+		if (mIntraFrameFence->GetCompletedValue() < mIntraWaitForValue) {
+			mIntraFrameFence->SetEventOnCompletion(mIntraWaitForValue, mIntraEventHandle);
+			WaitForSingleObject(mIntraEventHandle, INFINITE);
+		}
+		// Only one thread per PerFrameResources instance so shouldn't cause any issues
+		//mIntraWaitForValue++;
+	}
+
+
+
+
+	void SignalEndOfFrame(ID3D12CommandQueue* queue)
+	{
+		//Signal and increment the fence value.
+		const UINT64 fence = mPerFrameFenceValue;
+
+		mPerFrameWaitForValue = fence;
+
+		queue->Signal(mPerFrameFence, fence);
+
+		InterlockedIncrement(&mPerFrameFenceValue);
+	}
+
+	void WaitForEndOfPrevFrameWithThisIndex()
+	{
+		//Wait until command queue is done.
+		if (mPerFrameFence->GetCompletedValue() < mPerFrameWaitForValue) {
+			mPerFrameFence->SetEventOnCompletion(mPerFrameWaitForValue, mPerFrameEventHandle);
+			WaitForSingleObject(mPerFrameEventHandle, INFINITE);
+		}
+		// Only one thread per PerFrameResources instance so shouldn't cause any issues
+		//mPerFrameWaitForValue++;
+	}
+};
+
+struct PerThreadFenceHandle 
+{
+	HANDLE mHandle = CreateEvent(0, false, false, 0);
+
+
+	void WaitForFenceValue(ID3D12Fence1* fence, UINT64 value)
+	{
+		if (fence->GetCompletedValue() < value) {
+			fence->SetEventOnCompletion(value, mHandle);
+			WaitForSingleObject(mHandle, INFINITE);
+		}
+	}
+};
 
 struct CommandQueueAndFence
 {

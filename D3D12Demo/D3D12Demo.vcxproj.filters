@@ -25,6 +25,12 @@
     <Filter Include="Source Files\HLSL">
       <UniqueIdentifier>{1912b494-9a96-4896-befc-39b1c6987106}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\D3D12Timer">
+      <UniqueIdentifier>{a09b7db9-3ff9-4230-a4ae-c1407c899491}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\D3D12Timer">
+      <UniqueIdentifier>{fa114362-d744-4c04-a67d-1ed57cb51691}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -41,6 +47,9 @@
     </ClCompile>
     <ClCompile Include="RenderStage.cpp">
       <Filter>Source Files\GPUStages</Filter>
+    </ClCompile>
+    <ClCompile Include="D3D12Timer.cpp">
+      <Filter>Source Files\D3D12Timer</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -87,6 +96,9 @@
     </ClInclude>
     <ClInclude Include="ConstantsAndGlobals.hpp">
       <Filter>Header Files\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="D3D12Timer.h">
+      <Filter>Header Files\D3D12Timer</Filter>
     </ClInclude>
     <ClInclude Include="DragonTriangles.h">
       <Filter>Header Files\Common</Filter>

@@ -99,18 +99,25 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 	dev->CreateGraphicsPipelineState(&gpsd, IID_PPV_ARGS(&mPipelineState));
 }
 
-void RenderStage::Run(int index, Project* p)
+void RenderStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 {
 	static size_t lastRenderIterationIndex = 0;
+	static UINT64 frameCount = 0;
 
-	UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
+
+	//UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
+	//UINT backBufferIndex = index;
+	
+	PerFrameResources* perFrame = &p->gPerFrameResources[swapBufferIndex];
+
+
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
-	ID3D12CommandAllocator* directAllocator = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mAllocator;
-	D3D12GraphicsCommandListPtr	directList = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mCommandList;
+	ID3D12CommandAllocator* directAllocator = p->gAllocatorsAndLists[threadIndex][QUEUE_TYPE_DIRECT].mAllocator;
+	D3D12GraphicsCommandListPtr	directList = p->gAllocatorsAndLists[threadIndex][QUEUE_TYPE_DIRECT].mCommandList;
 
 	ID3D12Fence1* fence = p->gCommandQueues[QUEUE_TYPE_DIRECT].mFence;
-	HANDLE eventHandle = p->gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mEventHandle;
+	HANDLE eventHandle = p->gAllocatorsAndLists[threadIndex][QUEUE_TYPE_DIRECT].mEventHandle;
 
 	////! since WaitForGPU is called just before the commandlist is executed in the previous frame this does 
 	////! not need to be done here since the command allocator is already guaranteed to have finished executing
@@ -124,10 +131,17 @@ void RenderStage::Run(int index, Project* p)
 	directAllocator->Reset();
 	directList->Reset(directAllocator, mPipelineState);
 
+#ifdef RECORD_TIME
+	// timer start
+	p->gpuTimer[0].start(directList, frameCount);
+#endif
+
+	//Set root signature
+	directList->SetGraphicsRootSignature(p->gRootSignature);
 
 
 	// Indicate that the intermediate buffer will be used as a render target
-	SetResourceTransitionBarrier(directList, p->gIntermediateRenderTargets[backBufferIndex],
+	SetResourceTransitionBarrier(directList, perFrame->gIntermediateRenderTarget,
 		D3D12_RESOURCE_STATE_COMMON,
 		D3D12_RESOURCE_STATE_RENDER_TARGET
 	);
@@ -136,7 +150,7 @@ void RenderStage::Run(int index, Project* p)
 	//Record commands.
 	//Get the handle for the current render target in the intermediate output buffer.
 	D3D12_CPU_DESCRIPTOR_HANDLE cdh = p->gIntermediateRenderTargetsDescHeap->GetCPUDescriptorHandleForHeapStart();
-	cdh.ptr += p->gRenderTargetDescriptorSize * backBufferIndex;
+	cdh.ptr += p->gRenderTargetDescriptorSize * swapBufferIndex;
 
 	// get a handle to the depth/stencil buffer
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvh = p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
@@ -176,7 +190,7 @@ void RenderStage::Run(int index, Project* p)
 
 	//D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gRenderTargetsHeap->GetGPUDescriptorHandleForHeapStart();
 
-	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource[backBufferIndex]->GetGPUVirtualAddress();
+	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource[swapBufferIndex]->GetGPUVirtualAddress();
 
 	for(int i = 0; i < TOTAL_TRIS; ++i) {
 	//for (auto &m : p->mGameStateHandler.getReadOnlyStateAtIndex(index)->meshes) {
@@ -194,21 +208,27 @@ void RenderStage::Run(int index, Project* p)
 	}
 
 	// set state to common since this is used in by the compute queue as well
-	SetResourceTransitionBarrier(directList, p->gIntermediateRenderTargets[backBufferIndex],
+	SetResourceTransitionBarrier(directList, perFrame->gIntermediateRenderTarget,
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_COMMON
 	);
 
 
+#ifdef RECORD_TIME
+	// timer end
+	p->gpuTimer[0].stop(directList, frameCount);
+	p->gpuTimer[0].resolveQueryToCPU(directList, frameCount);
+#endif
+
 	//Close the list to prepare it for execution.
 	directList->Close();
 
 	//wait for current frame to finish rendering before pushing the next one to GPU
-	p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+	//p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
 
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute[] = { directList };
 	p->gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
 
-
+	frameCount++;
 }
