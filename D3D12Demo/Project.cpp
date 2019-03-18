@@ -789,10 +789,8 @@ void Project::CreateConstantBufferResources()
 	}
 }
 
-void Project::CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex)
+void Project::CopyComputeOutputToBackBuffer(UINT64 frameCount, int swapBufferIndex, int threadIndex)
 {
-	static UINT64 frameCount = 0;
-
 	UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 	
 	PerFrameResources* perFrame = &gPerFrameResources[swapBufferIndex];
@@ -849,8 +847,6 @@ void Project::CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute2[] = { directList };
 	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
-
-	frameCount++;
 }
 
 void Project::Render(int id)
@@ -900,7 +896,7 @@ void Project::Render(int id)
 			////////// Render geometry section //////////
 
 			// Render the geometry
-			GPUStages[0]->Run(swapBufferIndex, threadIndex, this);
+			GPUStages[0]->Run(frameIndex, swapBufferIndex, threadIndex, this);
 
 			// Signal that the geometry stage is finished
 			UINT64 threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
@@ -914,7 +910,7 @@ void Project::Render(int id)
 			////////// FXAA section //////////
 
 			// Apply FXAA to the rendered image with a compute shader
-			GPUStages[1]->Run(swapBufferIndex, threadIndex, this);
+			GPUStages[1]->Run(frameIndex, swapBufferIndex, threadIndex, this);
 
 			// Signal that the FXAA stage is finished
 			threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
@@ -935,7 +931,7 @@ void Project::Render(int id)
 			gPresentLock.lock();
 
 			// Copy the result of the FXAA compute shader to the back buffer
-			CopyComputeOutputToBackBuffer(swapBufferIndex, threadIndex);
+			CopyComputeOutputToBackBuffer(frameIndex, swapBufferIndex, threadIndex);
 
 			// Signal that the frame with frameIndex+1 can enter the present section after this one is done
 			gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gBackBufferFence, frameIndex + 1);
@@ -962,9 +958,9 @@ void Project::Render(int id)
 			D3D12::GPUTimestampPair timePair = gpuTimer[0].getTimestampPair(i);
 
 			char buffer[100];
-			sprintf_s(buffer, "%d : Geomtery start: %.6f\n", i, ((timePair.Start - firstTimestamp) * timestampToMs));
+			sprintf_s(buffer, "%d : Geometry start: %.6f\n", i, ((timePair.Start - firstTimestamp) * timestampToMs));
 			OutputDebugStringA(buffer);
-			sprintf_s(buffer, "%d : Geomtery stop: %.6f\n", i, ((timePair.Stop - firstTimestamp) * timestampToMs));
+			sprintf_s(buffer, "%d : Geometry stop: %.6f\n", i, ((timePair.Stop - firstTimestamp) * timestampToMs));
 			OutputDebugStringA(buffer);
 
 			timePair = gpuTimer[1].getTimestampPair(i);

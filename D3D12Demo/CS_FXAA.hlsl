@@ -263,14 +263,18 @@ void FXAA_main(
 
 		// FOR DEBUGGING. Highlights detected edges
 		//result = float4(1.0, 0.0, 0.0, 0.0);
+		if (orig_uv[0] < 0.5 && orig_uv[1] >= 0.5) result = float4(1.0, 0.0, 0.0, 1.0);
 
 
 		// FOR DEBUGGING
 	}
 
 
-	// Turn of FXAA for the left half of the screen
-	//if (orig_uv[0] < 0.5) result = inputTex[screen_pos];
+	// Turn of FXAA for the top left corner of the screen
+	if (orig_uv[0] < 0.5 && orig_uv[1] < 0.5) result = inputTex[screen_pos];
+
+	// Turn of FXAA for the bottom right corner of the screen
+	if (orig_uv[0] >= 0.5 && orig_uv[1] >= 0.5) result = inputTex[screen_pos];
 
 	//Flat color
 	//float4 result = float4(1.0f, 0.0f, 0.0f, 1.0f);

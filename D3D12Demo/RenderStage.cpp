@@ -99,11 +99,9 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 	dev->CreateGraphicsPipelineState(&gpsd, IID_PPV_ARGS(&mPipelineState));
 }
 
-void RenderStage::Run(int swapBufferIndex, int threadIndex, Project* p)
+void RenderStage::Run(UINT64 frameCount, int swapBufferIndex, int threadIndex, Project* p)
 {
 	static size_t lastRenderIterationIndex = 0;
-	static UINT64 frameCount = 0;
-
 
 	//UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
 	//UINT backBufferIndex = index;
@@ -229,6 +227,4 @@ void RenderStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute[] = { directList };
 	p->gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
-
-	frameCount++;
 }

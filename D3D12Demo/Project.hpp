@@ -51,7 +51,7 @@ public:
 	void CreateComputeShaderResources();
 	void CreateConstantBufferResources();
 
-	void CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex);
+	void CopyComputeOutputToBackBuffer(UINT64 frameCount, int swapBufferIndex, int threadIndex);
 	void Render(int id);
 
 	// ensure 256 bit alignment for the constant buffer
