@@ -141,7 +141,7 @@ void RenderStage::Run(int index, Project* p)
 
 
 	directList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	directList->IASetVertexBuffers(0, 2, &p->gVertexBufferView);
+	directList->IASetVertexBuffers(0, 2, p->gVertexBufferView);
 
 	//get the current game state
 

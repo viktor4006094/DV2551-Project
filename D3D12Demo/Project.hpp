@@ -95,7 +95,8 @@ public:
 	ID3D12RootSignature*		gRootSignature = nullptr;
 
 	ID3D12Resource1*			gVertexBufferResource = nullptr;
-	D3D12_VERTEX_BUFFER_VIEW	gVertexBufferView = {};
+	ID3D12Resource1*			gVertexBufferNormalResource = nullptr;
+	D3D12_VERTEX_BUFFER_VIEW	gVertexBufferView[2] = {};
 
 
 	// Constant buffers

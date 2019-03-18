@@ -345,16 +345,37 @@ void Project::CreateTriangleData()
 	D3D12_RANGE range = { 0, 0 }; //We do not intend to read this resource on the CPU.
 	gVertexBufferResource->Map(0, &range, &dataBegin);
 	memcpy(dataBegin, triangleVertices, sizeof(triangleVertices));
-	if (testVertex.a == 0.0f) {
-		int fdja = 23;
-	}
+
 	
 	gVertexBufferResource->Unmap(0, nullptr);
+	
+
+	gDevice5->CreateCommittedResource(
+		&hp,
+		D3D12_HEAP_FLAG_NONE,
+		&rd,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&gVertexBufferNormalResource));
+
+	gVertexBufferNormalResource->SetName(L"vbn heap");
+
+	//Copy the triangle data to the vertex buffer.
+	dataBegin = nullptr;
+	range = { 0, 0 }; //We do not intend to read this resource on the CPU.
+	gVertexBufferNormalResource->Map(0, &range, &dataBegin);
+	memcpy(dataBegin, normalVertices, sizeof(normalVertices));
+
+	
+	gVertexBufferNormalResource->Unmap(0, nullptr);
 
 	//Initialize vertex buffer view, used in the render call.
-	gVertexBufferView.BufferLocation = gVertexBufferResource->GetGPUVirtualAddress();
-	gVertexBufferView.StrideInBytes  = sizeof(Vertex);
-	gVertexBufferView.SizeInBytes    = sizeof(triangleVertices);
+	gVertexBufferView[0].BufferLocation = gVertexBufferResource->GetGPUVirtualAddress();
+	gVertexBufferView[0].StrideInBytes  = sizeof(Vertex);
+	gVertexBufferView[0].SizeInBytes    = sizeof(triangleVertices);
+	gVertexBufferView[1].BufferLocation = gVertexBufferNormalResource->GetGPUVirtualAddress();
+	gVertexBufferView[1].StrideInBytes = sizeof(Vertex);
+	gVertexBufferView[1].SizeInBytes = sizeof(normalVertices);
 }
 
 // todo remove unused root parameters and tables

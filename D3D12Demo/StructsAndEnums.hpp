@@ -67,8 +67,8 @@ enum QueueType : size_t {
 
 struct Vertex
 {
-	float a, s, d, f, g, h, j, k;
-	//float x, y, z, w; // Position
+	//float a, s, d, f, g, h, j, k;
+	float x, y, z, w; // Position
 	//float a, b, c, d;//normal
 	////float r,g,b; // Color
 

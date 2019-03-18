@@ -21,5 +21,6 @@ float4 PS_main( VSOut input ) : SV_TARGET0
 	//float4 output = float4((input.normal.xyz*input.normal.xyz*100),1.0f);
 	float4 output = float4(0.0,0.0,b,1.0f);
 	//return color;
-	return output;
+	//return output;
+	return float4(input.normal.xyz, 1.0f);
 }
