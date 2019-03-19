@@ -52,10 +52,10 @@ float rgb2luma(float3 rgb)
 
 [numthreads(32, 32, 1)]
 void FXAA_main(
-	uint3	dispaThreadID	: SV_DispatchThreadID,	// Global position
-	uint3	groupThreadID : SV_GroupThreadID,		// Group position
-	uint	groupInDRx : SV_GroupIndex,
-	uint3   groupID : SV_GroupID)
+	uint3   dispaThreadID : SV_DispatchThreadID,	// Global position
+	uint3   groupThreadID : SV_GroupThreadID,		// Group position
+	uint    groupInDRx    : SV_GroupIndex,
+	uint3   groupID       : SV_GroupID)
 {
 	float texWidth;
 	float texHeight;
