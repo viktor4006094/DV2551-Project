@@ -99,6 +99,9 @@ void Project::Start()
 {
 	gThreadPool->push([this](int id) {mGameStateHandler.Update(id, &mLatestBackBufferIndex); });
 	gThreadPool->push([this](int id) {this->Render(id); });
+#ifdef RECORD_TIME
+	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->GetClockCalibration(&mClockCalibration.GPUTimeStamp, &mClockCalibration.CPUTimeStamp);
+#endif
 }
 
 void Project::Stop()
@@ -887,8 +890,11 @@ void Project::Render(int id)
 	if (frameCounter < NUM_TIMESTAMP_PAIRS) {
 		//auto duration = std::chrono::high_resolution_clock::now().time_since_epoch();
 		{
-			using namespace std::chrono;
-			mCPUTimeStamps[frameIndex].Start = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch()).count();
+			LARGE_INTEGER time;
+			QueryPerformanceCounter(&time);
+			mCPUTimeStamps[frameCounter].Start = time.QuadPart;
+			//using namespace std::chrono;
+			//mCPUTimeStamps[frameIndex].Start = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch()).count();
 		}
 #endif
 		if (isRunning) {
@@ -950,8 +956,11 @@ void Project::Render(int id)
 			gPresentLock.unlock();
 #ifdef RECORD_TIME
 			{
-				using namespace std::chrono;
-				mCPUTimeStamps[frameIndex].Stop = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch()).count();
+				LARGE_INTEGER time;
+				QueryPerformanceCounter(&time);
+				mCPUTimeStamps[frameCounter].Stop = time.QuadPart;
+				//using namespace std::chrono;
+				//mCPUTimeStamps[frameIndex].Stop = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch()).count();
 			}
 #endif
 		}

@@ -160,11 +160,19 @@ public:
 #ifdef RECORD_TIME
 	struct CPUTimeStampPair
 	{
-		double Start;
-		double Stop;
+		UINT64 Start;
+		UINT64 Stop;
+		//double Start;
+		//double Stop;
 		//std::chrono::high_resolution_clock::time_point Start;
 		//std::chrono::high_resolution_clock::time_point Stop;
 	};
+
+	struct ClockCalibration
+	{
+		UINT64 GPUTimeStamp;
+		UINT64 CPUTimeStamp;
+	} mClockCalibration;
 
 	CPUTimeStampPair mCPUTimeStamps[NUM_TIMESTAMP_PAIRS];
 #endif
