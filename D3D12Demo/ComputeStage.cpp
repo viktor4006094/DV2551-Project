@@ -72,7 +72,7 @@ void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 	//todo release pointers
 }
 
-void ComputeStage::Run(UINT64 frameCount, int swapBufferIndex, int threadIndex, Project* p)
+void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, Project* p)
 {
 	//UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
 	//UINT backBufferIndex = index;
@@ -94,8 +94,10 @@ void ComputeStage::Run(UINT64 frameCount, int swapBufferIndex, int threadIndex, 
 	computeList->Reset(computeAllocator, mPipelineState);
 
 #ifdef RECORD_TIME
+	QueryPerformanceCounter(&p->mCPUTimeStamps[frameIndex][1].Start);
+
 	// timer start
-	p->gpuTimer[1].start(computeList, frameCount);
+	p->gpuTimer[1].start(computeList, frameIndex);
 #endif
 	//Set root signature
 	computeList->SetComputeRootSignature(p->gRootSignature);
@@ -148,8 +150,10 @@ void ComputeStage::Run(UINT64 frameCount, int swapBufferIndex, int threadIndex, 
 
 #ifdef RECORD_TIME
 	// timer end
-	p->gpuTimer[1].stop(computeList, frameCount);
-	p->gpuTimer[1].resolveQueryToCPU(computeList, frameCount);
+	p->gpuTimer[1].stop(computeList, frameIndex);
+	p->gpuTimer[1].resolveQueryToCPU(computeList, frameIndex);
+
+	QueryPerformanceCounter(&p->mCPUTimeStamps[frameIndex][1].Stop);
 #endif
 
 	//Close the list to prepare it for execution.

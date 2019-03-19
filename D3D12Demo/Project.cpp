@@ -100,7 +100,7 @@ void Project::Start()
 	gThreadPool->push([this](int id) {mGameStateHandler.Update(id, &mLatestBackBufferIndex); });
 	gThreadPool->push([this](int id) {this->Render(id); });
 #ifdef RECORD_TIME
-	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->GetClockCalibration(&mClockCalibration.GPUTimeStamp, &mClockCalibration.CPUTimeStamp);
+	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->GetClockCalibration(&mClockCalibration.gpuTimeStamp, &mClockCalibration.cpuTimeStamp);
 #endif
 }
 
@@ -792,7 +792,7 @@ void Project::CreateConstantBufferResources()
 	}
 }
 
-void Project::CopyComputeOutputToBackBuffer(UINT64 frameCount, int swapBufferIndex, int threadIndex)
+void Project::CopyComputeOutputToBackBuffer(UINT64 frameIndex, int swapBufferIndex, int threadIndex)
 {
 	UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 	
@@ -806,10 +806,11 @@ void Project::CopyComputeOutputToBackBuffer(UINT64 frameCount, int swapBufferInd
 
 	directAllocator->Reset();
 	directList->Reset(directAllocator, nullptr);
-
 #ifdef RECORD_TIME
-	// timer start
-	gpuTimer[2].start(directList, frameCount);
+	QueryPerformanceCounter(&mCPUTimeStamps[frameIndex][2].Start);
+
+	// gpu timer start
+	gpuTimer[2].start(directList, frameIndex);
 #endif
 
 	SetResourceTransitionBarrier(directList, perFrame->gUAVResource,
@@ -833,12 +834,15 @@ void Project::CopyComputeOutputToBackBuffer(UINT64 frameCount, int swapBufferInd
 	);
 
 #ifdef RECORD_TIME
-	gpuTimer[2].stop(directList, frameCount);
-	gpuTimer[2].resolveQueryToCPU(directList, frameCount);
-#endif
+	gpuTimer[2].stop(directList, frameIndex);
+	gpuTimer[2].resolveQueryToCPU(directList, frameIndex);
+	//Close the list to prepare it for execution.
 
+	QueryPerformanceCounter(&mCPUTimeStamps[frameIndex][2].Stop);
+#endif
 	//Close the list to prepare it for execution.
 	directList->Close();
+
 
 	// Wait for the FXAA stage to be finished
 	if (gThreadFences[threadIndex]->GetCompletedValue() < gThreadFenceValues[threadIndex]) {
@@ -887,15 +891,8 @@ void Project::Render(int id)
 	gThreadIDIndexLock.unlock();
 
 #ifdef RECORD_TIME
-	if (frameCounter < NUM_TIMESTAMP_PAIRS) {
-		//auto duration = std::chrono::high_resolution_clock::now().time_since_epoch();
-		{
-			LARGE_INTEGER time;
-			QueryPerformanceCounter(&time);
-			mCPUTimeStamps[frameCounter].Start = time.QuadPart;
-			//using namespace std::chrono;
-			//mCPUTimeStamps[frameIndex].Start = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch()).count();
-		}
+	if (frameIndex < NUM_TIMESTAMP_PAIRS) {
+		//QueryPerformanceCounter(&mCPUTimeStamps[frameIndex][0].Start);
 #endif
 		if (isRunning) {
 
@@ -910,6 +907,11 @@ void Project::Render(int id)
 
 			// Render the geometry
 			GPUStages[0]->Run(frameIndex, swapBufferIndex, threadIndex, this);
+
+#ifdef RECORD_TIME
+			//QueryPerformanceCounter(&mCPUTimeStamps[frameIndex][0].Stop);
+			//QueryPerformanceCounter(&mCPUTimeStamps[frameIndex][1].Start);
+#endif
 
 			// Signal that the geometry stage is finished
 			UINT64 threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
@@ -930,6 +932,10 @@ void Project::Render(int id)
 			gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
 
 
+#ifdef RECORD_TIME
+			//QueryPerformanceCounter(&mCPUTimeStamps[frameIndex][1].Stop);
+			//QueryPerformanceCounter(&mCPUTimeStamps[frameIndex][2].Start);
+#endif
 
 			////////// Present section //////////
 
@@ -953,62 +959,133 @@ void Project::Render(int id)
 			DXGI_PRESENT_PARAMETERS pp = {};
 			gSwapChain4->Present1(0, DXGI_PRESENT_ALLOW_TEARING, &pp);
 
-			gPresentLock.unlock();
 #ifdef RECORD_TIME
 			{
-				LARGE_INTEGER time;
-				QueryPerformanceCounter(&time);
-				mCPUTimeStamps[frameCounter].Stop = time.QuadPart;
+				//LARGE_INTEGER time;
+				// request a cpu timestamp until one is given
+				//QueryPerformanceCounter(&mCPUTimeStamps[frameIndex][2].Stop);
+				//mCPUTimeStamps[frameCounter].Stop = time.QuadPart;
 				//using namespace std::chrono;
 				//mCPUTimeStamps[frameIndex].Stop = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch()).count();
 			}
 #endif
+			gPresentLock.unlock();
 		}
 #ifdef RECORD_TIME
 	} else {
-		UINT64 directQueueFreq;
-		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->GetTimestampFrequency(&directQueueFreq);
-		double timestampToMs = (1.0 / directQueueFreq) * 1'000.0;
+		UINT64 gpuEpoch = mClockCalibration.gpuTimeStamp;
+
+		UINT64 gpuFreq;
+		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->GetTimestampFrequency(&gpuFreq);
+		double gpuTimestampToMs = (1.0 / gpuFreq) * 1'000.0;
 
 
-		UINT64 firstTimestamp = gpuTimer[0].getTimestampPair(0).Start;
+
+		UINT64 cpuEpoch = mClockCalibration.cpuTimeStamp;
+		
+		LARGE_INTEGER cpuLIFreq;
+		QueryPerformanceFrequency(&cpuLIFreq);
+		UINT64 cpuFreq = cpuLIFreq.QuadPart;
+		double cpuTimestampToMs = (1.0 / cpuFreq) * 1'000.0;
+
+
+
 
 		// save timestamps to file
 		for (int i = 0; i < NUM_TIMESTAMP_PAIRS; ++i) {
-			D3D12::GPUTimestampPair timePair = gpuTimer[0].getTimestampPair(i);
-			CPUTimeStampPair cpuTimePair = mCPUTimeStamps[i];
+	/*		D3D12::GPUTimestampPair gpuGeomTimePair = gpuTimer[0].getTimestampPair(i);
+			D3D12::GPUTimestampPair gpuFXAATimePair = gpuTimer[1].getTimestampPair(i);
+			D3D12::GPUTimestampPair gpuPresentTimePair = gpuTimer[2].getTimestampPair(i);*/
+			CPUTimeStampPair cpuTimePair = mCPUTimeStamps[i][0];
 
-			char buffer[100];
+			char buffer[1000];
 
-			//std::chrono::duration<double> cpuStart = std::chrono::duration_cast<std::chrono::duration<double>>()
+			double cpuTimes[3][2];
+			double gpuTimes[3][2];
+			
+			for (int part = 0; part < 3; part++) {
+				cpuTimes[part][0] = (mCPUTimeStamps[i][part].Start.QuadPart - cpuEpoch) * cpuTimestampToMs;
+				cpuTimes[part][1] = (mCPUTimeStamps[i][part].Stop.QuadPart  - cpuEpoch) * cpuTimestampToMs;
+			
+				D3D12::GPUTimestampPair gpuTSP = gpuTimer[part].getTimestampPair(i);
+				gpuTimes[part][0] = ((gpuTSP.Start - gpuEpoch) * gpuTimestampToMs);
+				gpuTimes[part][1] = ((gpuTSP.Stop  - gpuEpoch) * gpuTimestampToMs);
+			}
 
 
-			sprintf_s(buffer, "%d : CPU start: %.6f\n", i, (cpuTimePair.Start - (firstTimestamp * timestampToMs)));
+
+			/*double cpuGeomStart		= (mCPUTimeStamps[i][0].Start.QuadPart - cpuEpoch) * cpuTimestampToMs;
+			double cpuGeomStop		= (mCPUTimeStamps[i][0].Stop.QuadPart  - cpuEpoch) * cpuTimestampToMs;
+			double cpuFXAAStart		= (mCPUTimeStamps[i][1].Start.QuadPart - cpuEpoch) * cpuTimestampToMs;
+			double cpuFXAAStop		= (mCPUTimeStamps[i][1].Stop.QuadPart  - cpuEpoch) * cpuTimestampToMs;
+			double cpuPresentStart	= (mCPUTimeStamps[i][2].Start.QuadPart - cpuEpoch) * cpuTimestampToMs;
+			double cpuPresentStop	= (mCPUTimeStamps[i][2].Stop.QuadPart  - cpuEpoch) * cpuTimestampToMs;*/
+
+			//double gpuGeomStart = ((gpuGeomTimePair.Start - gpuEpoch) * gpuTimestampToMs);
+			//double gpuGeomStop = ((gpuGeomTimePair.Stop - gpuEpoch) * gpuTimestampToMs);
+			//double gpuFXAAStart = ((gpuGeomTimePair.Start - gpuEpoch) * gpuTimestampToMs);
+			//double gpuFXAAStop = (mCPUTimeStamps[i][1].Stop.QuadPart - cpuEpoch) * cpuTimestampToMs;
+			//double gpuPresentStart = ((gpuGeomTimePair.Start - gpuEpoch) * gpuTimestampToMs);
+			//double gpuPresentStop = (mCPUTimeStamps[i][2].Stop.QuadPart - cpuEpoch) * cpuTimestampToMs;
+
+			sprintf_s(buffer, "%% CPU frame: %d\n", i);
 			OutputDebugStringA(buffer);
-			sprintf_s(buffer, "%d : CPU Stop: %.6f\n", i, (cpuTimePair.Stop - (firstTimestamp * timestampToMs)));
+			sprintf_s(buffer, "\\addplot[geomStyle%d] coordinates{ (%.6f,1) (%.6f,1) }; \n", (i % 3), cpuTimes[0][0], cpuTimes[0][1]);
+			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "\\addplot[fxaaStyle%d] coordinates{ (%.6f,1) (%.6f,1) }; \n", (i % 3), cpuTimes[1][0], cpuTimes[1][1]);
+			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "\\addplot[presStyle%d] coordinates{ (%.6f,1) (%.6f,1) }; \n", (i % 3), cpuTimes[2][0], cpuTimes[2][1]);
 			OutputDebugStringA(buffer);
 
 
-			sprintf_s(buffer, "%d : Geometry start: %.6f\n", i, ((timePair.Start - firstTimestamp) * timestampToMs));
-			OutputDebugStringA(buffer);
-			sprintf_s(buffer, "%d : Geometry stop: %.6f\n", i, ((timePair.Stop - firstTimestamp) * timestampToMs));
-			OutputDebugStringA(buffer);
-
-			timePair = gpuTimer[1].getTimestampPair(i);
-
-			sprintf_s(buffer, "%d : FXAA start: %.6f\n", i, ((timePair.Start - firstTimestamp) * timestampToMs));
-			OutputDebugStringA(buffer);
-			sprintf_s(buffer, "%d : FXAA stop: %.6f\n", i, ((timePair.Stop - firstTimestamp) * timestampToMs));
-			OutputDebugStringA(buffer);
 
 
-			timePair = gpuTimer[2].getTimestampPair(i);
+			sprintf_s(buffer, "%% GPU frame: %d\n", i);
+			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "\\addplot[geomStyle%d] coordinates{ (%.6f,1.75) (%.6f,1.75) }; \n", (i % 3), gpuTimes[0][0], gpuTimes[0][1]);
+			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "\\addplot[fxaaStyle%d] coordinates{ (%.6f,2) (%.6f,2) }; \n", (i % 3), gpuTimes[1][0], gpuTimes[1][1]);
+			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "\\addplot[presStyle%d] coordinates{ (%.6f,1.75) (%.6f,1.75) }; \n\n", (i % 3), gpuTimes[2][0], gpuTimes[2][1]);
+			OutputDebugStringA(buffer);
+/*
+			sprintf_s(buffer, "%d : CPU Geometry start: %.6f\n", i, ((cpuTimePair.Start.QuadPart - cpuEpoch) * cpuTimestampToMs));
+			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "%d : CPU Geometry Stop: %.6f\n", i, ((cpuTimePair.Stop.QuadPart - cpuEpoch) * cpuTimestampToMs));
+			OutputDebugStringA(buffer);
 
 
-			sprintf_s(buffer, "%d : Present start: %.6f\n", i, ((timePair.Start - firstTimestamp) * timestampToMs));
+			sprintf_s(buffer, "%d : Geometry start: %.6f\n", i, ((gpuTimePair.Start - gpuEpoch) * gpuTimestampToMs));
 			OutputDebugStringA(buffer);
-			sprintf_s(buffer, "%d : Present stop: %.6f\n\n\n", i, ((timePair.Stop - firstTimestamp) * timestampToMs));
+			sprintf_s(buffer, "%d : Geometry stop: %.6f\n", i, ((gpuTimePair.Stop - gpuEpoch) * gpuTimestampToMs));
 			OutputDebugStringA(buffer);
+
+			gpuTimePair = gpuTimer[1].getTimestampPair(i);
+			cpuTimePair = mCPUTimeStamps[i][1];
+
+			sprintf_s(buffer, "%d : CPU FXAA start: %.6f\n", i, ((cpuTimePair.Start.QuadPart - cpuEpoch) * cpuTimestampToMs));
+			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "%d : CPU FXAA Stop: %.6f\n", i, ((cpuTimePair.Stop.QuadPart - cpuEpoch) * cpuTimestampToMs));
+			OutputDebugStringA(buffer);
+
+			sprintf_s(buffer, "%d : FXAA start: %.6f\n", i, ((gpuTimePair.Start - gpuEpoch) * gpuTimestampToMs));
+			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "%d : FXAA stop: %.6f\n", i, ((gpuTimePair.Stop - gpuEpoch) * gpuTimestampToMs));
+			OutputDebugStringA(buffer);
+
+
+			gpuTimePair = gpuTimer[2].getTimestampPair(i);
+			cpuTimePair = mCPUTimeStamps[i][2];
+
+			sprintf_s(buffer, "%d : CPU Present start: %.6f\n", i, ((cpuTimePair.Start.QuadPart - cpuEpoch) * cpuTimestampToMs));
+			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "%d : CPU Present Stop: %.6f\n", i, ((cpuTimePair.Stop.QuadPart - cpuEpoch) * cpuTimestampToMs));
+			OutputDebugStringA(buffer);
+
+			sprintf_s(buffer, "%d : Present start: %.6f\n", i, ((gpuTimePair.Start - gpuEpoch) * gpuTimestampToMs));
+			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "%d : Present stop: %.6f\n\n\n", i, ((gpuTimePair.Stop - gpuEpoch) * gpuTimestampToMs));
+			OutputDebugStringA(buffer);*/
 
 			//std::string s1 = std::to_string(i) + " Geometry start: " + std::to_string(geometryTime.Start);
 			//std::cout << i << " Geometry stop:  " << geometryTime.Stop << std::endl << std::endl;

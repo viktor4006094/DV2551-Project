@@ -53,7 +53,7 @@ public:
 	void CreateComputeShaderResources();
 	void CreateConstantBufferResources();
 
-	void CopyComputeOutputToBackBuffer(UINT64 frameCount, int swapBufferIndex, int threadIndex);
+	void CopyComputeOutputToBackBuffer(UINT64 frameIndex, int swapBufferIndex, int threadIndex);
 	void Render(int id);
 
 	// ensure 256 bit alignment for the constant buffer
@@ -160,8 +160,8 @@ public:
 #ifdef RECORD_TIME
 	struct CPUTimeStampPair
 	{
-		UINT64 Start;
-		UINT64 Stop;
+		LARGE_INTEGER Start;
+		LARGE_INTEGER Stop;
 		//double Start;
 		//double Stop;
 		//std::chrono::high_resolution_clock::time_point Start;
@@ -170,11 +170,11 @@ public:
 
 	struct ClockCalibration
 	{
-		UINT64 GPUTimeStamp;
-		UINT64 CPUTimeStamp;
+		UINT64 gpuTimeStamp;
+		UINT64 cpuTimeStamp;
 	} mClockCalibration;
 
-	CPUTimeStampPair mCPUTimeStamps[NUM_TIMESTAMP_PAIRS];
+	CPUTimeStampPair mCPUTimeStamps[NUM_TIMESTAMP_PAIRS][3];
 #endif
 
 

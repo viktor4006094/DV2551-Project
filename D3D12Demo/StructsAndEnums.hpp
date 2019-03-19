@@ -88,6 +88,12 @@ struct Vertex
 	//float a, b, c, d;//normal
 	////float r,g,b; // Color
 
+	//Vertex(double x_, double y_, double z_, double w_)
+	//	: x(static_cast<float>(x_)), y(static_cast<float>(y_)),
+	//	z(static_cast<float>(z_)), w(static_cast<float>(w_))
+	//{
+	//}
+
 	//Vertex(float _x, float _y, float _z, float _w, float _a, float _b, float _c, float _d) {
 	//	x = _x;
 	//	y = _y;

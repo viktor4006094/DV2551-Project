@@ -10,7 +10,7 @@ public:
 
 	void Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig);
 
-	void Run(UINT64 frameCount, int swapBufferIndex, int threadIndex, Project* p);
+	void Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, Project* p);
 private:
 
 };
