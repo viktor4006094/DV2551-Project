@@ -32,7 +32,12 @@ void GameStateHandler::CreateMeshes()
 		float c = 1.0f - fade * i;
 		cbData[i].color = float4{ c, c, c, 1.0 };
 
-		DirectX::XMStoreFloat4x4(&cbData[i].world, DirectX::XMMatrixTranspose(DirectX::XMMatrixScaling(2,2,2)* DirectX::XMMatrixTranslation((i%2)*40-20,0, (i / 2)*40-20)));
+		DirectX::XMStoreFloat4x4(
+			&cbData[i].world,
+			DirectX::XMMatrixTranspose(
+				DirectX::XMMatrixScaling(2, 2, 2)* DirectX::XMMatrixTranslation((i / 2) * 30 - 15, (i % 2) * 24 - 12, 0)
+			)
+		);
 		//cbData[i].world = DirectX::XMFLOAT4X4{ 0,0,0,0,0,0,0,0,0,0,0,0,i % 100,0,i / 100,1 };//DirectX::XMMatrixTranslation((i % 100), 0, (i / 40));
 		//writeState.meshes.push_back(m);
 	}
@@ -82,7 +87,7 @@ void GameStateHandler::Update(int id, UINT* currentFrameIndex)
 			//	//gXT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
 			//	//gYT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
 			//	//meshInd * (-1.0f / TOTAL_PLACES)));
-			DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(0.0000005f);
+			DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-delta/5000.0f);
 
 			DirectX::XMStoreFloat4x4(&cbData[m].world, temp);
 			DirectX::XMStoreFloat4x4(&cbData[m].viewProj, DirectX::XMMatrixTranspose(viewMat*projMat));;

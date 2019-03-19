@@ -72,10 +72,8 @@ void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 	//todo release pointers
 }
 
-void ComputeStage::Run(int swapBufferIndex, int threadIndex, Project* p)
+void ComputeStage::Run(UINT64 frameCount, int swapBufferIndex, int threadIndex, Project* p)
 {
-	static UINT64 frameCount = 0;
-
 	//UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
 	//UINT backBufferIndex = index;
 	
@@ -169,6 +167,4 @@ void ComputeStage::Run(int swapBufferIndex, int threadIndex, Project* p)
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute2[] = { computeList };
 	p->gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
-
-	frameCount++;
 }

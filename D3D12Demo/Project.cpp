@@ -838,10 +838,8 @@ void Project::CreateConstantBufferResources()
 	}
 }
 
-void Project::CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex)
+void Project::CopyComputeOutputToBackBuffer(UINT64 frameCount, int swapBufferIndex, int threadIndex)
 {
-	static UINT64 frameCount = 0;
-
 	UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 	
 	PerFrameResources* perFrame = &gPerFrameResources[swapBufferIndex];
@@ -898,8 +896,6 @@ void Project::CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute2[] = { directList };
 	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
-
-	frameCount++;
 }
 
 void Project::Render(int id)
@@ -918,10 +914,12 @@ void Project::Render(int id)
 	frameIndex = frameCounter;
 	frameCounter++;
 
+
 	// Wait for the swap chain so that no more than MAX_FRAME_LATENCY frames are being processed simultaneously
 	// See MAX_FRAME_LATENCY in ConstantsAndGlobals.hpp for the specified amount
 	WaitForSingleObjectEx(gSwapChainWaitableObject, 1000, true);
 
+	// todo: remove unused stuff
 	//get the thread index
 	gThreadIDIndexLock.lock();
 	CountFPS(mWndHandle);
@@ -936,6 +934,11 @@ void Project::Render(int id)
 
 #ifdef RECORD_TIME
 	if (frameCounter < NUM_TIMESTAMP_PAIRS) {
+		//auto duration = std::chrono::high_resolution_clock::now().time_since_epoch();
+		{
+			using namespace std::chrono;
+			mCPUTimeStamps[frameIndex].Start = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch()).count();
+		}
 #endif
 		if (isRunning) {
 
@@ -949,7 +952,7 @@ void Project::Render(int id)
 			////////// Render geometry section //////////
 
 			// Render the geometry
-			GPUStages[0]->Run(swapBufferIndex, threadIndex, this);
+			GPUStages[0]->Run(frameIndex, swapBufferIndex, threadIndex, this);
 
 			// Signal that the geometry stage is finished
 			UINT64 threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
@@ -963,7 +966,7 @@ void Project::Render(int id)
 			////////// FXAA section //////////
 
 			// Apply FXAA to the rendered image with a compute shader
-			GPUStages[1]->Run(swapBufferIndex, threadIndex, this);
+			GPUStages[1]->Run(frameIndex, swapBufferIndex, threadIndex, this);
 
 			// Signal that the FXAA stage is finished
 			threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
@@ -984,7 +987,7 @@ void Project::Render(int id)
 			gPresentLock.lock();
 
 			// Copy the result of the FXAA compute shader to the back buffer
-			CopyComputeOutputToBackBuffer(swapBufferIndex, threadIndex);
+			CopyComputeOutputToBackBuffer(frameIndex, swapBufferIndex, threadIndex);
 
 			// Signal that the frame with frameIndex+1 can enter the present section after this one is done
 			gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gBackBufferFence, frameIndex + 1);
@@ -994,8 +997,12 @@ void Project::Render(int id)
 			gSwapChain4->Present1(0, DXGI_PRESENT_ALLOW_TEARING, &pp);
 
 			gPresentLock.unlock();
-
-
+#ifdef RECORD_TIME
+			{
+				using namespace std::chrono;
+				mCPUTimeStamps[frameIndex].Stop = duration_cast<milliseconds>(high_resolution_clock::now().time_since_epoch()).count();
+			}
+#endif
 		}
 #ifdef RECORD_TIME
 	} else {
@@ -1009,11 +1016,22 @@ void Project::Render(int id)
 		// save timestamps to file
 		for (int i = 0; i < NUM_TIMESTAMP_PAIRS; ++i) {
 			D3D12::GPUTimestampPair timePair = gpuTimer[0].getTimestampPair(i);
+			CPUTimeStampPair cpuTimePair = mCPUTimeStamps[i];
 
 			char buffer[100];
-			sprintf_s(buffer, "%d : Geomtery start: %.6f\n", i, ((timePair.Start - firstTimestamp) * timestampToMs));
+
+			//std::chrono::duration<double> cpuStart = std::chrono::duration_cast<std::chrono::duration<double>>()
+
+
+			sprintf_s(buffer, "%d : CPU start: %.6f\n", i, (cpuTimePair.Start - (firstTimestamp * timestampToMs)));
 			OutputDebugStringA(buffer);
-			sprintf_s(buffer, "%d : Geomtery stop: %.6f\n", i, ((timePair.Stop - firstTimestamp) * timestampToMs));
+			sprintf_s(buffer, "%d : CPU Stop: %.6f\n", i, (cpuTimePair.Stop - (firstTimestamp * timestampToMs)));
+			OutputDebugStringA(buffer);
+
+
+			sprintf_s(buffer, "%d : Geometry start: %.6f\n", i, ((timePair.Start - firstTimestamp) * timestampToMs));
+			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "%d : Geometry stop: %.6f\n", i, ((timePair.Stop - firstTimestamp) * timestampToMs));
 			OutputDebugStringA(buffer);
 
 			timePair = gpuTimer[1].getTimestampPair(i);
@@ -1022,6 +1040,7 @@ void Project::Render(int id)
 			OutputDebugStringA(buffer);
 			sprintf_s(buffer, "%d : FXAA stop: %.6f\n", i, ((timePair.Stop - firstTimestamp) * timestampToMs));
 			OutputDebugStringA(buffer);
+
 
 			timePair = gpuTimer[2].getTimestampPair(i);
 

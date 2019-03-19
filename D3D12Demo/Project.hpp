@@ -17,6 +17,8 @@
 
 #include "GPUStage.hpp"
 
+#include <chrono>
+
 
 #pragma comment (lib, "d3d12.lib")
 #pragma comment (lib, "DXGI.lib")
@@ -51,7 +53,7 @@ public:
 	void CreateComputeShaderResources();
 	void CreateConstantBufferResources();
 
-	void CopyComputeOutputToBackBuffer(int swapBufferIndex, int threadIndex);
+	void CopyComputeOutputToBackBuffer(UINT64 frameCount, int swapBufferIndex, int threadIndex);
 	void Render(int id);
 
 	// ensure 256 bit alignment for the constant buffer
@@ -154,6 +156,21 @@ public:
 
 
 	bool isRunning = true;
+
+
+#ifdef RECORD_TIME
+	struct CPUTimeStampPair
+	{
+		double Start;
+		double Stop;
+		//std::chrono::high_resolution_clock::time_point Start;
+		//std::chrono::high_resolution_clock::time_point Stop;
+	};
+
+	CPUTimeStampPair mCPUTimeStamps[NUM_TIMESTAMP_PAIRS];
+#endif
+
+
 private:
 
 	GPUStage* GPUStages[2];
