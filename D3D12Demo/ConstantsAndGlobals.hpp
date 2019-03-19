@@ -15,7 +15,7 @@ const unsigned int NUM_THREADS = 10;
 const unsigned int MAX_FRAME_LATENCY = 3;
 
 // TOTAL_TRIS pretty much decides how many drawcalls in a brute force approach.
-constexpr int TOTAL_TRIS = 40; //todo rename
+constexpr int TOTAL_TRIS = 4; //todo rename
 // this has to do with how the triangles are spread in the screen, not important.
 constexpr int TOTAL_PLACES = 2 * 400 * 20;
 
@@ -28,7 +28,7 @@ const int SCREEN_WIDTH = 2*640; //Width of application.
 const int SCREEN_HEIGHT = 2*480;	//Height of application.
 
 
-const FLOAT gClearColor[] = { 0.1f, 0.1f, 0.1f, 1.0f };
+const FLOAT gClearColor[] = { 0.0f, 0.16f, 0.21f, 1.0f };
 
 const unsigned int MAX_PREPARED_FRAMES = 3; // number of frames that can be queued
 const unsigned int NUM_SWAP_BUFFERS = 3; //Number of buffers

@@ -30,10 +30,10 @@ void GameStateHandler::CreateMeshes()
 
 		// initialize meshes with greyscale colors
 		if (i == 0||i==1||i==3) {
-			cbData[i].color = float4{ 0.5f,0.5f,0.5f,1.0f };
+			cbData[i].color = float4{ 0.5f,0.48f,0.44f,1.0f };
 		}
 		else {
-			cbData[i].color = float4{ 0.0f,0.7f,0.5f, 1.0f };
+			cbData[i].color = float4{ 0.82f,0.2f,0.16f, 1.0f };
 		}
 		DirectX::XMStoreFloat4x4(
 			&cbData[i].world,
