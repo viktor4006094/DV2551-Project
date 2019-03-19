@@ -29,9 +29,12 @@ void GameStateHandler::CreateMeshes()
 		//TriangleObject m;
 
 		// initialize meshes with greyscale colors
-		float c = 1.0f - fade * i;
-		cbData[i].color = float4{ c, c, c, 1.0 };
-
+		if (i == 0||i==1||i==3) {
+			cbData[i].color = float4{ 0.5f,0.5f,0.5f,1.0f };
+		}
+		else {
+			cbData[i].color = float4{ 0.0f,0.7f,0.5f, 1.0f };
+		}
 		DirectX::XMStoreFloat4x4(
 			&cbData[i].world,
 			DirectX::XMMatrixTranspose(
@@ -66,11 +69,11 @@ void GameStateHandler::Update(int id, UINT* currentFrameIndex)
 			{
 				//gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
 				//m.color.values[i] += delta / 10000.0f * (i + 1);
-				cbData[m].color.data[i] += static_cast<float>(delta / 10000.0f * (i + 1));
-				if (cbData[m].color.data[i] > 1)
-				{
-					cbData[m].color.data[i] = 0;
-				}
+				//cbData[m].color.data[i] += static_cast<float>(delta / 10000.0f * (i + 1));
+				//if (cbData[m].color.data[i] > 1)
+				//{
+				//	cbData[m].color.data[i] = 0;
+				//}
 			//	cbData[m].color.data[i] = m /(float)TOTAL_TRIS;
 			}
 
