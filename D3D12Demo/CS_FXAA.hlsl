@@ -273,9 +273,17 @@ void FXAA_main(
 	// Turn of FXAA for the top left corner of the screen
 	if (orig_uv[0] < 0.5 && orig_uv[1] < 0.5) result = inputTex[screen_pos];
 
-	// Turn of FXAA for the bottom right corner of the screen
-	if (orig_uv[0] >= 0.5 && orig_uv[1] >= 0.5) result = inputTex[screen_pos];
+	// Turn of FXAA for the left half the bottom right corner of the screen
+	if (orig_uv[1] >= 0.5) {
+		if (orig_uv[0] >= 0.5 && orig_uv[0] < 0.75 && orig_uv[1] >= 0.5)
+			result = inputTex[screen_pos];
+		if (orig_uv[0] > 0.749 && orig_uv[0] < 0.751)
+			result = (result + float4(1.0, 1.0, 1.0, 1.0)) / 2.0;
+	}
 
+	if ((orig_uv[0] > 0.499 && orig_uv[0] < 0.501) || (orig_uv[1] > 0.499 && orig_uv[1] < 0.501))
+		result = float4(0.0, 0.0, 0.0, 1.0);
+	
 	//Flat color
 	//float4 result = float4(1.0f, 0.0f, 0.0f, 1.0f);
 

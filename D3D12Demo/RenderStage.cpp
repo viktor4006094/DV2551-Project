@@ -99,7 +99,7 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 	dev->CreateGraphicsPipelineState(&gpsd, IID_PPV_ARGS(&mPipelineState));
 }
 
-void RenderStage::Run(UINT64 frameCount, int swapBufferIndex, int threadIndex, Project* p)
+void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, Project* p)
 {
 	static size_t lastRenderIterationIndex = 0;
 
@@ -130,8 +130,10 @@ void RenderStage::Run(UINT64 frameCount, int swapBufferIndex, int threadIndex, P
 	directList->Reset(directAllocator, mPipelineState);
 
 #ifdef RECORD_TIME
+	QueryPerformanceCounter(&p->mCPUTimeStamps[frameIndex][0].Start);
+
 	// timer start
-	p->gpuTimer[0].start(directList, frameCount);
+	p->gpuTimer[0].start(directList, frameIndex);
 #endif
 
 	//Set root signature
@@ -202,7 +204,7 @@ void RenderStage::Run(UINT64 frameCount, int swapBufferIndex, int threadIndex, P
 		//directList->SetGraphicsRootDescriptorTable(4, gdh);
 		//gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-		directList->DrawInstanced(300000, 1, 0, 0);
+		directList->DrawInstanced(300'000, 1, 0, 0);
 	}
 
 	// set state to common since this is used in by the compute queue as well
@@ -214,8 +216,10 @@ void RenderStage::Run(UINT64 frameCount, int swapBufferIndex, int threadIndex, P
 
 #ifdef RECORD_TIME
 	// timer end
-	p->gpuTimer[0].stop(directList, frameCount);
-	p->gpuTimer[0].resolveQueryToCPU(directList, frameCount);
+	p->gpuTimer[0].stop(directList, frameIndex);
+	p->gpuTimer[0].resolveQueryToCPU(directList, frameIndex);
+
+	QueryPerformanceCounter(&p->mCPUTimeStamps[frameIndex][0].Stop);
 #endif
 
 	//Close the list to prepare it for execution.
