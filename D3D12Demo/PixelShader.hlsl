@@ -22,7 +22,7 @@ float4 PS_main( VSOut input ) : SV_TARGET0
 	//float4 output = float4(0.0,0.0,b,1.0f);
 	//return color;
 	float3 finalColor = color * float4(1.0f, 1.0f, 1.0f,1.0f);
-	finalColor += saturate(dot(normalize(float3(10.0f, 500.0f, 1.0f)), normOut)*color.xyz);
+	finalColor += saturate(dot(normalize(float3(250.0f, 450.0f, -450.0f)), normOut)*color.xyz);
 	//return float4((input.pos.xy)/256.0,0.0, 1.0);
 	//return float4(1.0, 1.0, 1.0, 1.0);
 	//return float4(input.normal.xyz, 1.0f);

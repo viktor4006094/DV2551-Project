@@ -190,7 +190,9 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 
 	//D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gRenderTargetsHeap->GetGPUDescriptorHandleForHeapStart();
 
-	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource[swapBufferIndex]->GetGPUVirtualAddress();
+	// todo only have one copy of the gamestate on the gpu since it isn't used in parallel
+	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource[0]->GetGPUVirtualAddress();
+	//D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource[swapBufferIndex]->GetGPUVirtualAddress();
 
 	for(int i = 0; i < TOTAL_TRIS; ++i) {
 	//for (auto &m : p->mGameStateHandler.getReadOnlyStateAtIndex(index)->meshes) {

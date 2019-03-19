@@ -29,7 +29,7 @@ void GameStateHandler::CreateMeshes()
 		//TriangleObject m;
 
 		// initialize meshes with greyscale colors
-		if (i == 0||i==1||i==3) {
+		if (i == 0||i==1||i==2||i==3) {
 			cbData[i].color = float4{ 0.5f,0.48f,0.44f,1.0f };
 		}
 		else {
@@ -55,62 +55,68 @@ void GameStateHandler::ShutDown()
 void GameStateHandler::Update(int id, UINT* currentFrameIndex)
 {
 	static auto startTime = std::chrono::high_resolution_clock::now();
+	static double tickRate = 512.0;
+
 	while (isRunning) {
-		int meshInd = 0;
-		static long long shift = 0;
-		static double dshift = 0.0;
-		static double delta = 0.0;
+		double t = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - startTime).count();
+		if (t >= 1000.0 / tickRate) {
+			int meshInd = 0;
+			static long long shift = 0;
+			static double dshift = 0.0;
+			static double delta = 0.0;
 
-		for (int m = 0; m < TOTAL_TRIS; m++) {
-		//for (auto &m : writeState.meshes) {
+			for (int m = 0; m < TOTAL_TRIS; m++) {
+				//for (auto &m : writeState.meshes) {
 
-			//Update color values in constant buffer
-			for (int i = 0; i < 3; i++)
-			{
-				//gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
-				//m.color.values[i] += delta / 10000.0f * (i + 1);
-				//cbData[m].color.data[i] += static_cast<float>(delta / 10000.0f * (i + 1));
-				//if (cbData[m].color.data[i] > 1)
-				//{
-				//	cbData[m].color.data[i] = 0;
-				//}
-			//	cbData[m].color.data[i] = m /(float)TOTAL_TRIS;
+					//Update color values in constant buffer
+				for (int i = 0; i < 3; i++)
+				{
+					//gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
+					//m.color.values[i] += delta / 10000.0f * (i + 1);
+					//cbData[m].color.data[i] += static_cast<float>(delta / 10000.0f * (i + 1));
+					//if (cbData[m].color.data[i] > 1)
+					//{
+					//	cbData[m].color.data[i] = 0;
+					//}
+				//	cbData[m].color.data[i] = m /(float)TOTAL_TRIS;
+				}
+
+				//Update positions of each mesh
+				//cbData[m].position = float4{
+				//	gXT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
+				//	gYT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
+				//	meshInd * (-1.0f / TOTAL_PLACES),
+				//	0.0f
+				//};
+
+
+				//DirectX::XMStoreFloat4x4(&cbData[m].world, DirectX::XMMatrixTranslation(//m/10, m%10, 0));
+				//	//gXT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
+				//	//gYT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
+				//	//meshInd * (-1.0f / TOTAL_PLACES)));
+				DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-1.0 / (tickRate * 5.0));
+				//DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-delta / 5000.0);
+
+				DirectX::XMStoreFloat4x4(&cbData[m].world, temp);
+				DirectX::XMStoreFloat4x4(&cbData[m].viewProj, DirectX::XMMatrixTranspose(viewMat*projMat));;
+
+				meshInd++;
 			}
 
-			//Update positions of each mesh
-			//cbData[m].position = float4{
-			//	gXT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
-			//	gYT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
-			//	meshInd * (-1.0f / TOTAL_PLACES),
-			//	0.0f
-			//};
+			shift += max((long long)(TOTAL_TRIS / 1000.0), (long long)(TOTAL_TRIS / 100.0));
+			delta = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - startTime).count();
+			dshift += delta * gMovementSpeed;
+			startTime = std::chrono::high_resolution_clock::now();
 
-			
-			//DirectX::XMStoreFloat4x4(&cbData[m].world, DirectX::XMMatrixTranslation(//m/10, m%10, 0));
-			//	//gXT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
-			//	//gYT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
-			//	//meshInd * (-1.0f / TOTAL_PLACES)));
-			DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-delta/5000.0f);
+			//copy updated gamestate to bufferstate
+			//gBufferTransferLock.lock();
 
-			DirectX::XMStoreFloat4x4(&cbData[m].world, temp);
-			DirectX::XMStoreFloat4x4(&cbData[m].viewProj, DirectX::XMMatrixTranspose(viewMat*projMat));;
+			//todo? copy it to the next frames buffer, 
+			memcpy((void*)pMappedCB[*currentFrameIndex], cbData, sizeof(cbData));
 
-			meshInd++;
+			//bufferState = writeState;
+			//gBufferTransferLock.unlock();
 		}
-	
-		shift += max((long long)(TOTAL_TRIS / 1000.0), (long long)(TOTAL_TRIS / 100.0));
-		delta = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - startTime).count();
-		dshift += delta * gMovementSpeed;
-		startTime = std::chrono::high_resolution_clock::now();
-
-		//copy updated gamestate to bufferstate
-		//gBufferTransferLock.lock();
-
-		//todo? copy it to the next frames buffer, 
-		memcpy((void*)pMappedCB[*currentFrameIndex], cbData, sizeof(cbData));
-
-		//bufferState = writeState;
-		//gBufferTransferLock.unlock();
 	}
 }
 

@@ -113,6 +113,7 @@ void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, 
 	computeList->SetDescriptorHeaps(_countof(dheap1), dheap1);
 
 	D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	// todo save increment size
 	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*swapBufferIndex;
 	computeList->SetComputeRootDescriptorTable(2, gdh);
 	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*(NUM_SWAP_BUFFERS - swapBufferIndex);
@@ -133,7 +134,7 @@ void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, 
 	computeList->Dispatch(squaresWide, squaresHigh, 1);
 
 
-	SetUAVTransitionBarrier(computeList, perFrame->gUAVResource);
+	//SetUAVTransitionBarrier(computeList, perFrame->gUAVResource);
 
 	SetResourceTransitionBarrier(computeList, perFrame->gUAVResource,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,

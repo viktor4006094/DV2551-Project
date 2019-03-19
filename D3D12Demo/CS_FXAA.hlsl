@@ -13,6 +13,7 @@ Texture2D<float4>   inputTex	: register(t0);
 RWTexture2D<float4> outputTex	: register(u0);
 SamplerState samp				: register(s0);
 
+#define DEMO
 
 //Used for syntax highlighting
 #if defined(__INTELLISENSE__)
@@ -263,27 +264,64 @@ void FXAA_main(
 
 		// FOR DEBUGGING. Highlights detected edges
 		//result = float4(1.0, 0.0, 0.0, 0.0);
+#ifdef DEMO
+		// BOTTOM LEFT CORNER
+		// Highlight detected edges in red
 		if (orig_uv[0] < 0.5 && orig_uv[1] >= 0.5) result = float4(1.0, 0.0, 0.0, 1.0);
-
+#endif
 
 		// FOR DEBUGGING
 	}
 
 
-	// Turn of FXAA for the top left corner of the screen
-	if (orig_uv[0] < 0.5 && orig_uv[1] < 0.5) result = inputTex[screen_pos];
+	//// Turn off FXAA for the top left corner of the screen
+	//if (orig_uv[0] < 0.5 && orig_uv[1] < 0.5) result = inputTex[screen_pos];
 
-	// Turn of FXAA for the left half the bottom right corner of the screen
-	if (orig_uv[1] >= 0.5) {
-		if (orig_uv[0] >= 0.5 && orig_uv[0] < 0.75 && orig_uv[1] >= 0.5)
+#ifdef DEMO
+	// BOTTOM RIGHT CORNER
+	// Turn off FXAA
+	if (orig_uv[0] > 0.5 && orig_uv[1] > 0.5) result = inputTex[screen_pos];
+
+	// TOP LEFT CORNER
+	// 3x zoomed in with FXAA on one half
+	if (orig_uv[0] > 0.2 && orig_uv[0] <= (0.2 + 1.0 / 6.0) && 
+		orig_uv[1] >= 0.1 && orig_uv[1] <= (0.1 + 1.0 / 6.0)) {
+
+		float2 adjusted_pos = (screen_pos - float2(screenSize.x/5.0,screenSize.y/10.0))*3.0;
+		
+		// Turn off FXAA on the left half
+		if (adjusted_pos.x < screenSize.x/4.0)
 			result = inputTex[screen_pos];
-		if (orig_uv[0] > 0.749 && orig_uv[0] < 0.751)
-			result = (result + float4(1.0, 1.0, 1.0, 1.0)) / 2.0;
+
+		// draw a line in the middle
+		if (adjusted_pos.x >= screenSize.x / 4.0 - 1.0 && adjusted_pos.x <= screenSize.x / 4.0 + 1.0)
+			result = result / 2.0;
+
+		// Each pixel writes to 9 pixels (3x zoom)
+		outputTex[adjusted_pos] = result;
+		outputTex[adjusted_pos + float2(0.0, 1.0)] = result;
+		outputTex[adjusted_pos + float2(0.0, 2.0)] = result;
+		outputTex[adjusted_pos + float2(1.0, 0.0)] = result;
+		outputTex[adjusted_pos + float2(2.0, 0.0)] = result;
+		outputTex[adjusted_pos + float2(1.0, 1.0)] = result;
+		outputTex[adjusted_pos + float2(1.0, 2.0)] = result;
+		outputTex[adjusted_pos + float2(2.0, 1.0)] = result;
+		outputTex[adjusted_pos + float2(2.0, 2.0)] = result;
 	}
 
+	// draw lines seperating the four corners
 	if ((orig_uv[0] > 0.499 && orig_uv[0] < 0.501) || (orig_uv[1] > 0.499 && orig_uv[1] < 0.501))
 		result = float4(0.0, 0.0, 0.0, 1.0);
-	
+
+	// Output the result to all corners but the top left one since that's already been written to
+	if (orig_uv[0] > 0.499 || orig_uv[1] > 0.499) {
+		outputTex[screen_pos] = result;
+	}
+#else
+	outputTex[screen_pos] = result;
+#endif
+
+
 	//Flat color
 	//float4 result = float4(1.0f, 0.0f, 0.0f, 1.0f);
 
@@ -296,6 +334,7 @@ void FXAA_main(
 
 	//Thread ID
 	//float4 result = float4((screen_pos.x / 1920.0f), (screen_pos.y / 1080.0f), 0.0f, 1.0f);
-
-	outputTex[screen_pos] = result;
+	/*if (orig_uv[0] > 0.499 || orig_uv[1] > 0.499) {
+		outputTex[screen_pos] = result;
+	}*/
 }
