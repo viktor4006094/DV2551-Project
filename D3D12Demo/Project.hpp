@@ -123,7 +123,8 @@ public:
 	ID3D12Resource1*			gVertexBufferResource = nullptr;
 	ID3D12Resource1*			gVertexBufferNormalResource = nullptr;
 	D3D12_VERTEX_BUFFER_VIEW	gVertexBufferView[2] = {};
-
+	ID3D12Resource1*			gVertexStagingBufferResource = nullptr;
+	ID3D12Resource1*			gNormalStagingBufferResource = nullptr;
 
 	// Constant buffers
 	ID3D12DescriptorHeap*	gDescriptorHeap[NUM_SWAP_BUFFERS] = {};

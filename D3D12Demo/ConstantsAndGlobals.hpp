@@ -15,7 +15,7 @@ const unsigned int NUM_THREADS = 10;
 const unsigned int MAX_FRAME_LATENCY = 2;
 
 // TOTAL_TRIS pretty much decides how many drawcalls in a brute force approach.
-constexpr int TOTAL_TRIS = 4;
+constexpr int TOTAL_TRIS = 400;
 // this has to do with how the triangles are spread in the screen, not important.
 constexpr int TOTAL_PLACES = 2 * 400 * 20;
 

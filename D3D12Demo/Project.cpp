@@ -422,13 +422,12 @@ void Project::CreateTriangleData()
 	//	{ 0.05f, -0.05f, 0.0f, 1.0f }
 
 	//};
-
 	//Note: using upload heaps to transfer static data like vert buffers is not 
 	//recommended. Every time the GPU needs it, the upload heap will be marshalled 
 	//over. Please read up on Default Heap usage. An upload heap is used here for 
 	//code simplicity and because there are very few vertices to actually transfer.
 	D3D12_HEAP_PROPERTIES hp = {};
-	hp.Type				= D3D12_HEAP_TYPE_UPLOAD;
+	hp.Type				= D3D12_HEAP_TYPE_DEFAULT;
 	hp.CreationNodeMask = 1;
 	hp.VisibleNodeMask	= 1;
 
@@ -447,40 +446,84 @@ void Project::CreateTriangleData()
 		&hp,
 		D3D12_HEAP_FLAG_NONE,
 		&rd,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
+		D3D12_RESOURCE_STATE_COPY_DEST,
 		nullptr,
 		IID_PPV_ARGS(&gVertexBufferResource));
 
 	gVertexBufferResource->SetName(L"vb heap");
 
-	//Copy the triangle data to the vertex buffer.
-	void* dataBegin = nullptr;
-	D3D12_RANGE range = { 0, 0 }; //We do not intend to read this resource on the CPU.
-	gVertexBufferResource->Map(0, &range, &dataBegin);
-	memcpy(dataBegin, triangleVertices, sizeof(triangleVertices));
-
-	
-	gVertexBufferResource->Unmap(0, nullptr);
-	
-
 	gDevice5->CreateCommittedResource(
 		&hp,
 		D3D12_HEAP_FLAG_NONE,
 		&rd,
-		D3D12_RESOURCE_STATE_GENERIC_READ,
+		D3D12_RESOURCE_STATE_COPY_DEST,
 		nullptr,
 		IID_PPV_ARGS(&gVertexBufferNormalResource));
 
 	gVertexBufferNormalResource->SetName(L"vbn heap");
 
+	D3D12_HEAP_PROPERTIES hp2 = {};
+	hp2.Type = D3D12_HEAP_TYPE_UPLOAD;
+	hp2.CreationNodeMask = 1;
+	hp2.VisibleNodeMask = 1;
+
+	D3D12_RESOURCE_DESC rd2 = {};
+	rd2.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	rd2.Width = sizeof(triangleVertices);
+	rd2.Height = 1;
+	rd2.DepthOrArraySize = 1;
+	rd2.MipLevels = 1;
+	rd2.SampleDesc.Count = 1;
+	rd2.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	gDevice5->CreateCommittedResource(
+		&hp2,
+		D3D12_HEAP_FLAG_NONE,
+		&rd2,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&gVertexStagingBufferResource));
+
+	gVertexStagingBufferResource->SetName(L"vertex staging heap");
+
+	gDevice5->CreateCommittedResource(
+		&hp2,
+		D3D12_HEAP_FLAG_NONE,
+		&rd2,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&gNormalStagingBufferResource));
+
+	gNormalStagingBufferResource->SetName(L"normal staging heap");
+
+	//Copy the triangle data to the vertex buffer.
+	void* dataBegin = nullptr;
+	D3D12_RANGE range = { 0, 0 }; //We do not intend to read this resource on the CPU.
+	gVertexStagingBufferResource->Map(0, &range, &dataBegin);
+	memcpy(dataBegin, triangleVertices, sizeof(triangleVertices));
+	gVertexStagingBufferResource->Unmap(0, nullptr);
+
 	//Copy the triangle data to the vertex buffer.
 	dataBegin = nullptr;
 	range = { 0, 0 }; //We do not intend to read this resource on the CPU.
-	gVertexBufferNormalResource->Map(0, &range, &dataBegin);
+	gNormalStagingBufferResource->Map(0, &range, &dataBegin);
 	memcpy(dataBegin, normalVertices, sizeof(normalVertices));
+	gNormalStagingBufferResource->Unmap(0, nullptr);
+	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->Reset(gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mAllocator, NULL);
+	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->CopyBufferRegion(gVertexBufferResource, 0, gVertexStagingBufferResource, 0, sizeof(triangleVertices));
+	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->CopyBufferRegion(gVertexBufferNormalResource, 0, gNormalStagingBufferResource, 0, sizeof(triangleVertices));
 
-	
-	gVertexBufferNormalResource->Unmap(0, nullptr);
+	D3D12_RESOURCE_BARRIER barrierDesc{};
+	barrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrierDesc.Transition.pResource = gVertexBufferResource;
+	barrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+	barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+
+	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->ResourceBarrier(1, &barrierDesc);
+
+	barrierDesc.Transition.pResource = gVertexBufferNormalResource;
+	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->ResourceBarrier(1, &barrierDesc);
 
 	//Initialize vertex buffer view, used in the render call.
 	gVertexBufferView[0].BufferLocation = gVertexBufferResource->GetGPUVirtualAddress();
@@ -489,6 +532,12 @@ void Project::CreateTriangleData()
 	gVertexBufferView[1].BufferLocation = gVertexBufferNormalResource->GetGPUVirtualAddress();
 	gVertexBufferView[1].StrideInBytes = sizeof(Vertex);
 	gVertexBufferView[1].SizeInBytes = sizeof(normalVertices);
+
+	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->Close();
+	std::vector<ID3D12CommandList*> ppCommandLists{ gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList };
+	gCommandQueues[0].mQueue->ExecuteCommandLists(static_cast<UINT>(ppCommandLists.size()), ppCommandLists.data());
+	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->Reset(gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mAllocator, NULL);
+
 }
 
 // todo remove unused root parameters and tables
