@@ -15,36 +15,32 @@ GameStateHandler::~GameStateHandler()
 
 void GameStateHandler::CreateMeshes()
 {
-	// create the translation arrays used for moving the triangles around on the screen
-	float degToRad = (float)M_PI / 180.0f;
-	float scale = (float)TOTAL_PLACES / 359.9f;
-	for (int a = 0; a < TOTAL_PLACES; a++)
-	{
-		gXT[a] = 0.8f * cosf(degToRad * ((float)a / scale) * 3.0f);
-		gYT[a] = 0.8f * sinf(degToRad * ((float)a / scale) * 2.0f);
-	};
-
-	float fade = 1.0f / TOTAL_TRIS;
-	for (int i = 0; i < TOTAL_TRIS; ++i) {
-		//TriangleObject m;
-
-		// initialize meshes with greyscale colors
-		if (i == 0||i==1||i==2||i==3) {
-			cbData[i].color = float4{ 0.5f,0.48f,0.44f,1.0f };
+	for (int i = 0; i < TOTAL_DRAGONS; ++i) {
+		switch (i) {
+		case 0:
+			cbData[i].color = float4{ 0.2f, 0.2f, 1.0f, 1.0f };
+			break;
+		case 1:
+			cbData[i].color = float4{ 1.0f, 1.0f, 1.0f, 1.0f };
+			break;
+		case 2:
+		case 3:
+			cbData[i].color = float4{ 1.0f, 0.2f, 0.2f, 1.0f };
+			break;
+		default:
+			cbData[i].color = float4{ 1.0f, 1.0f, 1.0f, 1.0f };
+			break;
 		}
-		else {
-			cbData[i].color = float4{ 0.82f,0.2f,0.16f, 1.0f };
-		}
+
 		DirectX::XMStoreFloat4x4(
 			&cbData[i].world,
 			DirectX::XMMatrixTranspose(
-				DirectX::XMMatrixScaling(2, 2, 2)* DirectX::XMMatrixTranslation((i / 2) * 30 - 15, (i % 2) * 24 - 12, 0)
+				DirectX::XMMatrixScaling(2.0f, 2.0f, 2.0f)* DirectX::XMMatrixTranslation((i / 2) * 30.0f - 15.0f, (i % 2) * 24.0f - 12.0f, 0.0f)
 			)
 		);
 		//cbData[i].world = DirectX::XMFLOAT4X4{ 0,0,0,0,0,0,0,0,0,0,0,0,i % 100,0,i / 100,1 };//DirectX::XMMatrixTranslation((i % 100), 0, (i / 40));
 		//writeState.meshes.push_back(m);
 	}
-
 }
 
 void GameStateHandler::ShutDown()
@@ -52,6 +48,7 @@ void GameStateHandler::ShutDown()
 	isRunning = false;
 }
 
+// todo remove currentFrameIndex, use only one constantbuffer on the gpu
 void GameStateHandler::Update(int id, UINT* currentFrameIndex)
 {
 	static auto startTime = std::chrono::high_resolution_clock::now();
@@ -65,35 +62,8 @@ void GameStateHandler::Update(int id, UINT* currentFrameIndex)
 			static double dshift = 0.0;
 			static double delta = 0.0;
 
-			for (int m = 0; m < TOTAL_TRIS; m++) {
-				//for (auto &m : writeState.meshes) {
-
-					//Update color values in constant buffer
-				for (int i = 0; i < 3; i++)
-				{
-					//gConstantBufferCPU.colorChannel[i] += 0.0001f * (i + 1);
-					//m.color.values[i] += delta / 10000.0f * (i + 1);
-					//cbData[m].color.data[i] += static_cast<float>(delta / 10000.0f * (i + 1));
-					//if (cbData[m].color.data[i] > 1)
-					//{
-					//	cbData[m].color.data[i] = 0;
-					//}
-				//	cbData[m].color.data[i] = m /(float)TOTAL_TRIS;
-				}
-
-				//Update positions of each mesh
-				//cbData[m].position = float4{
-				//	gXT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
-				//	gYT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
-				//	meshInd * (-1.0f / TOTAL_PLACES),
-				//	0.0f
-				//};
-
-
-				//DirectX::XMStoreFloat4x4(&cbData[m].world, DirectX::XMMatrixTranslation(//m/10, m%10, 0));
-				//	//gXT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
-				//	//gYT[(int)(float)(meshInd * 100 + dshift) % (TOTAL_PLACES)],
-				//	//meshInd * (-1.0f / TOTAL_PLACES)));
+			for (int m = 0; m < TOTAL_DRAGONS; m++) {
+				//Update world matrixes of each mesh
 				DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-1.0 / (tickRate * 5.0));
 				//DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-delta / 5000.0);
 
@@ -103,7 +73,7 @@ void GameStateHandler::Update(int id, UINT* currentFrameIndex)
 				meshInd++;
 			}
 
-			shift += max((long long)(TOTAL_TRIS / 1000.0), (long long)(TOTAL_TRIS / 100.0));
+			shift += max((long long)(TOTAL_DRAGONS / 1000.0), (long long)(TOTAL_DRAGONS / 100.0));
 			delta = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - startTime).count();
 			dshift += delta * gMovementSpeed;
 			startTime = std::chrono::high_resolution_clock::now();

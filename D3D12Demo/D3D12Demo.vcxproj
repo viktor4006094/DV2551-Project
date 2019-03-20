@@ -258,7 +258,6 @@
     <ClInclude Include="RenderStage.hpp" />
     <ClInclude Include="StructsAndEnums.hpp" />
     <ClInclude Include="ConstantsAndGlobals.hpp" />
-    <ClInclude Include="main.hpp" />
     <ClInclude Include="Project.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

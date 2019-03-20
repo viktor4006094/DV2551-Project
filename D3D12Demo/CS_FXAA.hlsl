@@ -268,7 +268,7 @@ void FXAA_main(
 #ifdef DEMO
 		// BOTTOM LEFT CORNER
 		// Highlight detected edges in red
-		if (orig_uv[0] < 0.5 && orig_uv[1] >= 0.5) result = float4(1.0, 0.0, 0.0, 1.0);
+		if (orig_uv[0] < 0.5 && orig_uv[1] >= 0.5) result = float4(1.0, 1.0, 1.0, 1.0);
 #endif
 
 		// FOR DEBUGGING
@@ -298,6 +298,7 @@ void FXAA_main(
 		if (adjusted_pos.x >= screenSize.x / 4.0 - 1.0 && adjusted_pos.x <= screenSize.x / 4.0 + 1.0)
 			result = result / 2.0;
 
+
 		// Each pixel writes to 9 pixels (3x zoom)
 		outputTex[adjusted_pos] = result;
 		outputTex[adjusted_pos + float2(0.0, 1.0)] = result;
@@ -311,11 +312,11 @@ void FXAA_main(
 	}
 
 	// draw lines seperating the four corners
-	if ((orig_uv[0] > 0.499 && orig_uv[0] < 0.501) || (orig_uv[1] > 0.499 && orig_uv[1] < 0.501))
-		result = float4(0.0, 0.0, 0.0, 1.0);
+	//if ((orig_uv[0] > 0.499 && orig_uv[0] < 0.501) || (orig_uv[1] > 0.499 && orig_uv[1] < 0.501))
+		//result = float4(0.0, 0.0, 0.0, 1.0);
 
 	// Output the result to all corners but the top left one since that's already been written to
-	if (orig_uv[0] > 0.499 || orig_uv[1] > 0.499) {
+	if (orig_uv[0] >= 0.500 || orig_uv[1] > 0.5) {
 		outputTex[screen_pos] = result;
 	}
 #else

@@ -6,6 +6,8 @@
 #include <d3dtypes.h>
 #include <string>
 
+#pragma region HelperFunctions
+
 template<class Interface>
 inline void SafeRelease(Interface **ppInterfaceToRelease)
 {
@@ -34,21 +36,6 @@ inline void SetResourceTransitionBarrier(
 }
 
 
-inline void SetUAVTransitionBarrier(
-	ID3D12GraphicsCommandList* commandList,
-	ID3D12Resource* resource)
-{
-	D3D12_RESOURCE_BARRIER barrierDesc = {};
-
-	barrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-	barrierDesc.UAV.pResource = resource;
-	//barrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	//barrierDesc.Transition.StateBefore = StateBefore;
-	//barrierDesc.Transition.StateAfter = StateAfter;
-
-	commandList->ResourceBarrier(1, &barrierDesc);
-}
-
 inline void CountFPS(HWND wndHandle)
 {
 	// FPS counter
@@ -67,7 +54,7 @@ inline void CountFPS(HWND wndHandle)
 	}
 }
 
-
+#pragma endregion
 
 
 #pragma region Enums
@@ -81,41 +68,14 @@ enum QueueType : size_t {
 //todo move some of these to their classes
 #pragma region HelperStructs
 
-struct Vertex
-{
-	//float a, s, d, f, g, h, j, k;
-	float x, y, z, w; // Position
-	//float a, b, c, d;//normal
-	////float r,g,b; // Color
-
-	//Vertex(double x_, double y_, double z_, double w_)
-	//	: x(static_cast<float>(x_)), y(static_cast<float>(y_)),
-	//	z(static_cast<float>(z_)), w(static_cast<float>(w_))
-	//{
-	//}
-
-	//Vertex(float _x, float _y, float _z, float _w, float _a, float _b, float _c, float _d) {
-	//	x = _x;
-	//	y = _y;
-	//	z = _z;
-	//	w = _w;
-	//	a = _a;
-	//	b = _b;
-	//	c = _c;
-	//	d = _d;
-	//}
-};
-
-struct float4
-{
-	float data[4];
-};
-
+typedef union {
+	struct { float x, y, z, w; };
+	struct { float r, g, b, a; };
+} float4;
 
 struct alignas(256) CONSTANT_BUFFER_DATA {
 	DirectX::XMFLOAT4X4 world;
 	DirectX::XMFLOAT4X4 viewProj;
-	//float4 position;
 	float4 color;
 };
 
@@ -123,7 +83,6 @@ struct PerFrameResources
 {
 	ID3D12Resource1* gIntermediateRenderTarget = nullptr;
 	ID3D12Resource1* gUAVResource = nullptr;
-	//ID3D12Resource1* gSwapChainRenderTarget = nullptr;
 
 	ID3D12Fence1*	mIntraFrameFence		= nullptr;
 	HANDLE			mIntraEventHandle		= nullptr;

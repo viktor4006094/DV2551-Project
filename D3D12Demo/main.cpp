@@ -6,10 +6,14 @@
 // 181009: Stefan Petersson, cleanups/updates DXGI 1.6
 //--------------------------------------------------------------------------------------
 
-
-#include "main.hpp"
-
+#include <windows.h>
 #include "Project.hpp"
+
+
+#pragma region ForwardDeclerations
+HWND				InitWindow(HINSTANCE hInstance);	//1. Create Window
+LRESULT CALLBACK	WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+#pragma endregion
 
 #pragma region wwinMain
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
@@ -20,17 +24,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 
 	MSG msg		= {0};
 	gWndHandle	= InitWindow(hInstance);			//1. Create Window
-	if(gWndHandle)
-	{
+	if(gWndHandle) {
 		project->Init(gWndHandle);
-
 		project->Start();
 
 		ShowWindow(gWndHandle, nCmdShow);
-		while(WM_QUIT != msg.message)
-		{
-			if(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
-			{
+		while(WM_QUIT != msg.message) {
+			if(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
 				TranslateMessage(&msg);
 				DispatchMessage(&msg);
 			}
@@ -69,7 +69,7 @@ HWND InitWindow(HINSTANCE hInstance)//1. Create Window
 	return CreateWindowEx(
 		WS_EX_OVERLAPPEDWINDOW,
 		L"DV2551_Project",
-		L"DV2551 JPEG Project",
+		L"DV2551 FXAA Project",
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,

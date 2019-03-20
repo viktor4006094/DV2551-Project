@@ -194,7 +194,7 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource[0]->GetGPUVirtualAddress();
 	//D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource[swapBufferIndex]->GetGPUVirtualAddress();
 
-	for(int i = 0; i < TOTAL_TRIS; ++i) {
+	for(int i = 0; i < TOTAL_DRAGONS; ++i) {
 	//for (auto &m : p->mGameStateHandler.getReadOnlyStateAtIndex(index)->meshes) {
 		directList->SetGraphicsRootConstantBufferView(0, gpuVir);
 		//directList->SetComputeRootConstantBufferView(0, gpuVir);

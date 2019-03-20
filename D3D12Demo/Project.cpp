@@ -530,10 +530,10 @@ void Project::CreateTriangleData()
 
 	//Initialize vertex buffer view, used in the render call.
 	gVertexBufferView[0].BufferLocation = gVertexBufferResource->GetGPUVirtualAddress();
-	gVertexBufferView[0].StrideInBytes  = sizeof(Vertex);
+	gVertexBufferView[0].StrideInBytes  = sizeof(float4);
 	gVertexBufferView[0].SizeInBytes    = sizeof(triangleVertices);
 	gVertexBufferView[1].BufferLocation = gVertexBufferNormalResource->GetGPUVirtualAddress();
-	gVertexBufferView[1].StrideInBytes = sizeof(Vertex);
+	gVertexBufferView[1].StrideInBytes = sizeof(float4);
 	gVertexBufferView[1].SizeInBytes = sizeof(normalVertices);
 
 	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->Close();
@@ -769,7 +769,7 @@ void Project::CreateConstantBufferResources()
 	for (int i = 0; i < NUM_SWAP_BUFFERS; i++)
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC heapDescriptorDesc = {};
-		heapDescriptorDesc.NumDescriptors = TOTAL_TRIS;
+		heapDescriptorDesc.NumDescriptors = TOTAL_DRAGONS;
 		heapDescriptorDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		heapDescriptorDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		gDevice5->CreateDescriptorHeap(&heapDescriptorDesc, IID_PPV_ARGS(&gDescriptorHeap[i]));

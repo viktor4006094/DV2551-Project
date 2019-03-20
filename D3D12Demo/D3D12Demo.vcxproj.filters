@@ -73,9 +73,6 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="main.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Project.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
