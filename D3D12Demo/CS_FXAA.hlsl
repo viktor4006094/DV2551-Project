@@ -25,14 +25,14 @@ SamplerState samp				: register(s0);
 #ifdef TEXTURE_WIDTH
 #ifdef TEXTURE_HEIGHT
 groupshared float2 screenSize = float2(TEXTURE_WIDTH, TEXTURE_HEIGHT);
-groupshared float2 inverseScreenSize = float2((1.0 / TEXTURE_WIDTH), (1.0 / TEXTURE_HEIGHT));
+groupshared float2 invScrSize = float2((1.0 / TEXTURE_WIDTH), (1.0 / TEXTURE_HEIGHT));
 #else
 groupshared float2 screenSize = float2(1.0, 1.0);
-groupshared float2 inverseScreenSize = float2(-1.0, -1.0);
+groupshared float2 invScrSize = float2(-1.0, -1.0);
 #endif
 #else
 groupshared float2 screenSize = float2(1.0, 1.0);
-groupshared float2 inverseScreenSize = float2(-1.0, -1.0);
+groupshared float2 invScrSize = float2(-1.0, -1.0);
 #endif
 
 #define EDGE_THRESHOLD_MIN 0.0312
@@ -60,7 +60,7 @@ void FXAA_main(
 {
 	float texWidth;
 	float texHeight;
-	float2 orig_uv = (dispaThreadID.xy + float2(0.5, 0.5)) * inverseScreenSize;
+	float2 orig_uv = (dispaThreadID.xy + float2(0.5, 0.5)) * invScrSize;
 
 	float2 screen_pos = dispaThreadID.xy;
 
@@ -83,10 +83,11 @@ void FXAA_main(
 	float lumaC = rgb2luma(colorCenter);
 
 	// Luma at the four direct neighbours of the current fragment
-	float lumaD = rgb2luma(inputTex[screen_pos + float2(0.0, 1.0)].rgb);
-	float lumaU = rgb2luma(inputTex[screen_pos + float2(0.0, -1.0)].rgb);
-	float lumaL = rgb2luma(inputTex[screen_pos + float2(-1.0, 0.0)].rgb);
-	float lumaR = rgb2luma(inputTex[screen_pos + float2(1.0, 0.0)].rgb);
+	float lumaD = rgb2luma(inputTex.SampleLevel(samp, orig_uv + float2(0.0,  invScrSize.y), 0).rgb);
+	float lumaU = rgb2luma(inputTex.SampleLevel(samp, orig_uv + float2(0.0, -invScrSize.y), 0).rgb);
+	float lumaL = rgb2luma(inputTex.SampleLevel(samp, orig_uv + float2(-invScrSize.x, 0.0), 0).rgb);
+	float lumaR = rgb2luma(inputTex.SampleLevel(samp, orig_uv + float2( invScrSize.x, 0.0), 0).rgb);
+
 
 	// Find the max and min luma around the current fragment
 	float lumaMin = min(lumaC, min(min(lumaD, lumaU), min(lumaL, lumaR)));
@@ -99,14 +100,14 @@ void FXAA_main(
 
 	// Early exit if no edge is detected in the area or if the area is really dark, 
 	// or if the TEXTURE_WIDHT/HEIGHT macros have not gotten to the shader
-	if (lumaRange < max(EDGE_THRESHOLD_MIN, (lumaMax * EDGE_THRESHOLD_MAX)) || inverseScreenSize.x == -1.0) {
+	if (lumaRange < max(EDGE_THRESHOLD_MIN, (lumaMax * EDGE_THRESHOLD_MAX)) || invScrSize.x == -1.0) {
 		result = float4(colorCenter, 1.0);
 	} else {
 		// The four remaining corners' lumas
-		float lumaDR = rgb2luma(inputTex[screen_pos + float2(1.0, 1.0)].rgb);
-		float lumaDL = rgb2luma(inputTex[screen_pos + float2(-1.0, 1.0)].rgb);
-		float lumaUR = rgb2luma(inputTex[screen_pos + float2(1.0, -1.0)].rgb);
-		float lumaUL = rgb2luma(inputTex[screen_pos + float2(-1.0, -1.0)].rgb);
+		float lumaDR = rgb2luma(inputTex.SampleLevel(samp, orig_uv + float2( invScrSize.x,  invScrSize.y), 0).rgb);
+		float lumaDL = rgb2luma(inputTex.SampleLevel(samp, orig_uv + float2(-invScrSize.x,  invScrSize.y), 0).rgb);
+		float lumaUR = rgb2luma(inputTex.SampleLevel(samp, orig_uv + float2( invScrSize.x, -invScrSize.y), 0).rgb);
+		float lumaUL = rgb2luma(inputTex.SampleLevel(samp, orig_uv + float2(-invScrSize.x, -invScrSize.y), 0).rgb);
 
 		// Combine the four edges' lumas
 		float lumaDU = lumaD + lumaU;
@@ -138,7 +139,7 @@ void FXAA_main(
 		float gradScaled = 0.25 * max(abs(grad1), abs(grad2));
 
 		// Choose the step size (one pixel) according to the edge direction
-		float stepLength = isHorizontal ? inverseScreenSize.y : inverseScreenSize.x;
+		float stepLength = isHorizontal ? invScrSize.y : invScrSize.x;
 
 		// average luma in the correct direction
 		float lumaLocalAverage = 0.0;
@@ -162,7 +163,7 @@ void FXAA_main(
 		// ---------------------------- First iteration. One step in both directions --------------------------
 
 		// Compute offset (for each iteration step) in the right directio
-		float2 offset = isHorizontal ? float2(inverseScreenSize.x, 0.0) : float2(0.0, inverseScreenSize.y);
+		float2 offset = isHorizontal ? float2(invScrSize.x, 0.0) : float2(0.0, invScrSize.y);
 		// Compute UVs to explore each side of the edge.
 		float2 uv1 = currentUV - offset;
 		float2 uv2 = currentUV + offset;
@@ -287,7 +288,7 @@ void FXAA_main(
 	if (orig_uv[0] > 0.2 && orig_uv[0] <= (0.2 + 1.0 / 6.0) && 
 		orig_uv[1] >= 0.1 && orig_uv[1] <= (0.1 + 1.0 / 6.0)) {
 
-		float2 adjusted_pos = (screen_pos - float2(screenSize.x/5.0,screenSize.y/10.0))*3.0;
+		float2 adjusted_pos = (screen_pos - float2(screenSize.x / 5.0, screenSize.y / 10.0))*3.0;
 		
 		// Turn off FXAA on the left half
 		if (adjusted_pos.x < screenSize.x/4.0)

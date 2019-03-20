@@ -100,8 +100,5 @@
     <ClInclude Include="D3D12Timer.h">
       <Filter>Header Files\D3D12Timer</Filter>
     </ClInclude>
-    <ClInclude Include="DragonTriangles.h">
-      <Filter>Header Files\Common</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>

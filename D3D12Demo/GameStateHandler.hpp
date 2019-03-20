@@ -20,7 +20,7 @@ public:
 	bool isRunning = true;
 	//DirectX::XMMATRIX projMat = DirectX::XMMatrixPerspectiveFovLH(3.0f*(3.14f / 180.0f), (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 2000.0f);
 	DirectX::XMMATRIX projMat = DirectX::XMMatrixOrthographicLH(SCREEN_WIDTH / 20.0f, SCREEN_HEIGHT / 20.0f, 0.1f, 100.0f);
-	DirectX::XMMATRIX viewMat = DirectX::XMMatrixLookAtLH({ 0, 10, -10 }, { 0, 10, 0 }, { 0,1,0 });
+	DirectX::XMMATRIX viewMat = DirectX::XMMatrixLookAtLH({ 0, 10, -50 }, { 0, 10, 0 }, { 0,1,0 });
 	CONSTANT_BUFFER_DATA cbData[TOTAL_TRIS];
 	CONSTANT_BUFFER_DATA *pMappedCB[NUM_SWAP_BUFFERS];
 private:
