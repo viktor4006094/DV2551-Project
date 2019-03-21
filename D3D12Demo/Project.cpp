@@ -1028,6 +1028,8 @@ void Project::Render(int id)
 		sprintf_s(buffer, "%% Timestamps with max frame latency: %d\n\n\n", MAX_FRAME_LATENCY);
 		fprintf(f, "%s", buffer);
 
+		std::string numberStr[3] = { "Zero", "One", "Two" };
+
 		// save timestamps to file
 		for (int i = 0; i < NUM_TIMESTAMP_PAIRS; ++i) {
 			CPUTimeStampPair cpuTimePair = mCPUTimeStamps[i][0];
@@ -1048,20 +1050,20 @@ void Project::Render(int id)
 
 			sprintf_s(buffer, "%% CPU frame: %d\n", frame);
 			fprintf(f, "%s", buffer);
-			sprintf_s(buffer, "\\addplot[geomStyle%d] coordinates{ (%.6f,%.1f) (%.6f,%.1f) }; \n", (i % 3), cpuTimes[0][0], (0.9 + (i % 3) / 10.0), cpuTimes[0][1], (0.9 + (i % 3) / 10.0));
+			sprintf_s(buffer, "\\addplot[geomStyle%s] coordinates{ (%.6f,%.1f) (%.6f,%.1f) }; \n", numberStr[(i % 3)].c_str(), cpuTimes[0][0], (0.9 + (i % 3) / 10.0), cpuTimes[0][1], (0.9 + (i % 3) / 10.0));
 			fprintf(f, "%s", buffer);
-			sprintf_s(buffer, "\\addplot[fxaaStyle%d] coordinates{ (%.6f,%.1f) (%.6f,%.1f) }; \n", (i % 3), cpuTimes[1][0], (0.9 + (i % 3) / 10.0), cpuTimes[1][1], (0.9 + (i % 3) / 10.0));
+			sprintf_s(buffer, "\\addplot[fxaaStyle%s] coordinates{ (%.6f,%.1f) (%.6f,%.1f) }; \n", numberStr[(i % 3)].c_str(), cpuTimes[1][0], (0.9 + (i % 3) / 10.0), cpuTimes[1][1], (0.9 + (i % 3) / 10.0));
 			fprintf(f, "%s", buffer);
-			sprintf_s(buffer, "\\addplot[presStyle%d] coordinates{ (%.6f,%.1f) (%.6f,%.1f) }; \n", (i % 3), cpuTimes[2][0], (0.9 + (i % 3) / 10.0), cpuTimes[2][1], (0.9 + (i % 3) / 10.0));
+			sprintf_s(buffer, "\\addplot[presStyle%s] coordinates{ (%.6f,%.1f) (%.6f,%.1f) }; \n", numberStr[(i % 3)].c_str(), cpuTimes[2][0], (0.9 + (i % 3) / 10.0), cpuTimes[2][1], (0.9 + (i % 3) / 10.0));
 			fprintf(f, "%s", buffer);
 
 			sprintf_s(buffer, "%% GPU frame: %d\n", frame);
 			fprintf(f, "%s", buffer);
-			sprintf_s(buffer, "\\addplot[geomStyle%d] coordinates{ (%.6f,1.75) (%.6f,1.75) }; \n", (i % 3), gpuTimes[0][0], gpuTimes[0][1]);
+			sprintf_s(buffer, "\\addplot[geomStyle%s] coordinates{ (%.6f,1.75) (%.6f,1.75) }; \n", numberStr[(i % 3)].c_str(), gpuTimes[0][0], gpuTimes[0][1]);
 			fprintf(f, "%s", buffer);
-			sprintf_s(buffer, "\\addplot[fxaaStyle%d] coordinates{ (%.6f,2) (%.6f,2) }; \n", (i % 3), gpuTimes[1][0], gpuTimes[1][1]);
+			sprintf_s(buffer, "\\addplot[fxaaStyle%s] coordinates{ (%.6f,2) (%.6f,2) }; \n", numberStr[(i % 3)].c_str(), gpuTimes[1][0], gpuTimes[1][1]);
 			fprintf(f, "%s", buffer);
-			sprintf_s(buffer, "\\addplot[presStyle%d] coordinates{ (%.6f,1.75) (%.6f,1.75) }; \n\n", (i % 3), gpuTimes[2][0], gpuTimes[2][1]);
+			sprintf_s(buffer, "\\addplot[presStyle%s] coordinates{ (%.6f,1.75) (%.6f,1.75) }; \n\n", numberStr[(i % 3)].c_str(), gpuTimes[2][0], gpuTimes[2][1]);
 			fprintf(f, "%s", buffer);
 		}
 		fclose(f);

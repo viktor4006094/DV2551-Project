@@ -8,7 +8,7 @@
 #include <vector>
 
 //#define VETTIG_DATOR
-//#define RECORD_TIME
+#define RECORD_TIME
 
 const unsigned int NUM_THREADS = 10;
 
@@ -37,8 +37,8 @@ static std::mutex gBufferTransferLock;
 
 static std::mutex gPresentLock;
 
-const unsigned int FIRST_TIMESTAMPED_FRAME = 1000;
-const unsigned int NUM_TIMESTAMP_PAIRS = 20;
+const unsigned int FIRST_TIMESTAMPED_FRAME = 1;
+const unsigned int NUM_TIMESTAMP_PAIRS = 10;
 
 #ifdef VETTIG_DATOR
 typedef ID3D12Device5* D3D12DevPtr;
