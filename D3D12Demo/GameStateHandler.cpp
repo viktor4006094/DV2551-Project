@@ -15,7 +15,7 @@ GameStateHandler::~GameStateHandler()
 
 void GameStateHandler::CreateMeshes()
 {
-	for (int i = 0; i < TOTAL_DRAGONS; ++i) {
+	for (int i = 0; i < 4; ++i) {
 		switch (i) {
 		case 0:
 			cbData[i].color = float4{ 0.2f, 0.2f, 1.0f, 1.0f };
@@ -41,6 +41,21 @@ void GameStateHandler::CreateMeshes()
 		//cbData[i].world = DirectX::XMFLOAT4X4{ 0,0,0,0,0,0,0,0,0,0,0,0,i % 100,0,i / 100,1 };//DirectX::XMMatrixTranslation((i % 100), 0, (i / 40));
 		//writeState.meshes.push_back(m);
 	}
+	srand(time(NULL));
+	for (int i = 4; i < TOTAL_DRAGONS; i++) {
+		float a, b, c;
+		a =((float)rand())/(float)RAND_MAX; 
+		b = ((float)rand()) / (float)RAND_MAX;
+		c = ((float)rand()) / (float)RAND_MAX;
+		cbData[i].color = float4{ a, b, c, 1.0f };
+		int j = i - 4;
+		DirectX::XMStoreFloat4x4(
+			&cbData[i].world,
+			DirectX::XMMatrixTranspose(
+				DirectX::XMMatrixScaling(0.1f, 0.1f, 0.1f)* DirectX::XMMatrixTranslation((j / 20) * 3.0f - 28.0f, (j % 20) * 2.4f - 13.0f, 20.0f)
+			)
+		);
+	}
 }
 
 void GameStateHandler::ShutDown()
@@ -63,12 +78,28 @@ void GameStateHandler::Update(int id, UINT* currentFrameIndex)
 			static double delta = 0.0;
 
 			for (int m = 0; m < TOTAL_DRAGONS; m++) {
-				//Update world matrixes of each mesh
-				DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-1.0 / (tickRate * 5.0));
-				//DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-delta / 5000.0);
+				if (m < 4) {
+					//Update world matrixes of each mesh
+					DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-1.0 / (tickRate * 5.0));
+					//DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-delta / 5000.0);
+					DirectX::XMStoreFloat4x4(&cbData[m].world, temp);
+					DirectX::XMStoreFloat4x4(&cbData[m].viewProj, DirectX::XMMatrixTranspose(viewMat*projMat));;
 
-				DirectX::XMStoreFloat4x4(&cbData[m].world, temp);
-				DirectX::XMStoreFloat4x4(&cbData[m].viewProj, DirectX::XMMatrixTranspose(viewMat*projMat));;
+				}
+				else {
+					int colInd = (m - 4) / 20;
+					int dir=1;
+					if (colInd % 3 < 1) {
+						dir = -1;
+					}
+					float speed = ((colInd % 4) + 1) * 1.0f;
+
+
+					DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(dir / (tickRate *speed));
+					DirectX::XMStoreFloat4x4(&cbData[m].world, temp);
+					DirectX::XMStoreFloat4x4(&cbData[m].viewProj, DirectX::XMMatrixTranspose(viewMat*projMat));;
+
+				}
 
 				meshInd++;
 			}
