@@ -59,10 +59,16 @@ inline void CountFPS(HWND wndHandle)
 
 #pragma region Enums
 enum QueueType : size_t {
-	QUEUE_TYPE_DIRECT = 0,
-	QUEUE_TYPE_COPY = 1,
-	QUEUE_TYPE_COMPUTE = 2
+	QT_DIR = 0,
+	QT_COMP = 1
 };
+
+enum InFrameStage : size_t {
+	GEOMETRY_STAGE = 0,
+	FXAA_STAGE = 1,
+	PRESENT_STAGE = 2
+};
+
 #pragma endregion
 
 //todo move some of these to their classes
@@ -173,19 +179,19 @@ struct PerFrameResources
 	}
 };
 
-struct PerThreadFenceHandle 
-{
-	HANDLE mHandle = CreateEvent(0, false, false, 0);
-
-
-	void WaitForFenceValue(ID3D12Fence1* fence, UINT64 value)
-	{
-		if (fence->GetCompletedValue() < value) {
-			fence->SetEventOnCompletion(value, mHandle);
-			WaitForSingleObject(mHandle, INFINITE);
-		}
-	}
-};
+//struct PerThreadFenceHandle 
+//{
+//	HANDLE mHandle = CreateEvent(0, false, false, 0);
+//
+//
+//	void WaitForFenceValue(ID3D12Fence1* fence, UINT64 value)
+//	{
+//		if (fence->GetCompletedValue() < value) {
+//			fence->SetEventOnCompletion(value, mHandle);
+//			WaitForSingleObject(mHandle, INFINITE);
+//		}
+//	}
+//};
 
 struct CommandQueueAndFence
 {
@@ -235,38 +241,49 @@ struct CommandAllocatorAndList
 	ID3D12CommandAllocator*		mAllocator = nullptr;
 	D3D12GraphicsCommandListPtr mCommandList = nullptr;
 
-	UINT64 mLastFrameWithThisAllocatorFenceValue = 0;
-	HANDLE				mEventHandle = nullptr;
+	//UINT64 mLastFrameWithThisAllocatorFenceValue = 0;
+	//HANDLE				mEventHandle = nullptr;
 
 	void CreateCommandListAndAllocator(QueueType type, D3D12DevPtr dev)
 	{
 		D3D12_COMMAND_LIST_TYPE listType = D3D12_COMMAND_LIST_TYPE_DIRECT;
-		if (type == QUEUE_TYPE_COPY) { listType = D3D12_COMMAND_LIST_TYPE_COPY; }
-		if (type == QUEUE_TYPE_COMPUTE) { listType = D3D12_COMMAND_LIST_TYPE_COMPUTE; }
+		if (type == QT_COMP) { listType = D3D12_COMMAND_LIST_TYPE_COMPUTE; }
 
-		dev->CreateCommandAllocator(
+		HRESULT hr = dev->CreateCommandAllocator(
 			listType,
 			IID_PPV_ARGS(&mAllocator));
 
 		//Create command list.
-		dev->CreateCommandList(
+		hr = dev->CreateCommandList(
 			0,
 			listType,
 			mAllocator,
 			nullptr,
 			IID_PPV_ARGS(&mCommandList));
 
+		if (FAILED(hr)) {
+			int a = 47318;
+		}
+
 		//Command lists are created in the recording state. Since there is nothing to
 		//record right now and the main loop expects it to be closed, we close it.
 		mCommandList->Close();
 
-		mEventHandle = CreateEvent(0, false, false, 0);
+		//mEventHandle = CreateEvent(0, false, false, 0);
+
+#ifdef _DEBUG
+		//HRESULT hr = S_OK;
+		if (type == QT_DIR)
+			hr = mAllocator->SetName(L"Direct Allocator");
+		if (type == QT_COMP)
+			hr = mAllocator->SetName(L"Compute Allocator");
+#endif
 
 	}
 
 	void Release()
 	{
-		CloseHandle(mEventHandle);
+		//CloseHandle(mEventHandle);
 		SafeRelease(&mAllocator);
 		SafeRelease(&mCommandList);
 	}

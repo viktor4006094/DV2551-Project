@@ -28,9 +28,10 @@ const int SCREEN_HEIGHT = 3*300; //Height of application.
 const FLOAT gClearColor[] = { 0.0f, 0.16f, 0.21f, 1.0f };
 
 // todo: remove max_prepared_frames, not needed since max_thread_latency exists
-const unsigned int MAX_PREPARED_FRAMES = MAX_FRAME_LATENCY + 1; // number of frames that can be queued
-const unsigned int NUM_SWAP_BUFFERS = MAX_FRAME_LATENCY + 1; //Number of buffers
+const unsigned int MAX_PREPARED_FRAMES = MAX_FRAME_LATENCY; // number of frames that can be queued
+const unsigned int NUM_SWAP_BUFFERS = MAX_FRAME_LATENCY; //Number of buffers
 
+const unsigned int NUM_STAGES_IN_FRAME = 3;
 
 static std::mutex gThreadIDIndexLock;
 static std::mutex gBufferTransferLock;

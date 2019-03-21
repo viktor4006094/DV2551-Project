@@ -30,18 +30,16 @@ void Project::Init(HWND wndHandle)
 	GPUStages[1] = new ComputeStage();
 
 	CreateDirect3DDevice(wndHandle);					//2. Create Device
-	CreateCommandInterfacesAndSwapChain(wndHandle);	//3. Create CommandQueue and SwapChain
+	CreateCommandInterfacesAndSwapChain(wndHandle);		//3. Create CommandQueue and SwapChain
 	CreateFenceAndEventHandle();						//4. Create Fence and Event handle
 	CreateRenderTargets();								//5. Create render targets for backbuffer
 	CreateViewportAndScissorRect();						//6. Create viewport and rect
 	CreateRootSignature();								//7. Create root signature
 	CreateShadersAndPipelineStates();					//8. Set up the pipeline state
-
 	CreateConstantBufferResources();					//9. Create constant buffer data
-	CreateTriangleData();								//10. Create vertexdata
-	mGameStateHandler.CreateMeshes();
-	//CreateMeshes();										//11. Create meshes (all use same triangle but different constant buffers)
-	CreateComputeShaderResources();
+	UploadMeshData();									//10. Uploads the mesh data to the GPU
+	mGameStateHandler.CreatePerMeshData();				//11. Set the colors and positions of the meshes
+	CreateComputeShaderResources();						//12. Create UAVs and SRVs for the FXAA stage
 
 	for (int i = 0; i < NUM_THREADS; ++i) {
 		gThreadFenceValues[i] = 0;
@@ -49,20 +47,15 @@ void Project::Init(HWND wndHandle)
 		gDevice5->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gThreadFences[i]));
 	}
 
+	// Create per swap buffer events and fence to present the frames in the correct order
 	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
-		//gSwapBufferFenceValues[i] = 0;// NUM_SWAP_BUFFERS; //? 0
-		////gSwapBufferWaitValues[i] = 0;
-		//gSwapBufferFenceEvents[i] = CreateEvent(0, false, false, 0);
-		//gDevice5->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gSwapBufferFences[i]));
-	
-		//
 		gBackBufferFenceEvent[i] = CreateEvent(0, false, false, 0);
 	}
-
 	gDevice5->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gBackBufferFence));
 
 	// todo move elsewhere?
 #ifdef _DEBUG
+	// Set names to make debugging easier
 	std::wstring intStr = L"InterMediateRenderTarget";
 	std::wstring uavStr = L"UAVResource";
 	std::wstring swapStr = L"SwapChainRenderTarget";
@@ -82,22 +75,20 @@ void Project::Init(HWND wndHandle)
 	}
 
 
-	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->SetName(L"DirectQueue");
-	gCommandQueues[QUEUE_TYPE_COPY].mQueue->SetName(L"CopyQueue");
-	gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->SetName(L"ComputeQueue");
+	gCommandQueues[QT_DIR].mQueue->SetName(L"DirectQueue");
+	gCommandQueues[QT_COMP].mQueue->SetName(L"ComputeQueue");
 #endif
-
-
 	gpuTimer[0].init(gDevice5, 100);
 	gpuTimer[1].init(gDevice5, 100);
 	gpuTimer[2].init(gDevice5, 100);
 
-	WaitForGpu(QUEUE_TYPE_DIRECT);
+	// todo: remove this function and inline it here
+	WaitForGpu(QT_DIR);
 }
 
 void Project::Start()
 {
-	gThreadPool->push([this](int id) {mGameStateHandler.Update(id, &mLatestBackBufferIndex); });
+	gThreadPool->push([this](int id) {mGameStateHandler.Update(id); });
 	gThreadPool->push([this](int id) {this->Render(id); });
 #ifdef RECORD_TIME
 	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->GetClockCalibration(&mClockCalibration.gpuTimeStamp, &mClockCalibration.cpuTimeStamp);
@@ -114,11 +105,11 @@ void Project::Shutdown()
 {
 	mGameStateHandler.ShutDown();
 
-	WaitForGpu(QUEUE_TYPE_DIRECT); //todo DON'T
+	WaitForGpu(QT_DIR); //todo DON'T
 
-	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
-		gConstantBufferResource[i]->Unmap(0, nullptr);
-	}
+	//for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
+		gConstantBufferResource->Unmap(0, nullptr);
+	//}
 
 	//CloseHandle(gEventHandle);
 	SafeRelease(&gDevice5);
@@ -127,10 +118,10 @@ void Project::Shutdown()
 	gCommandQueues[1].Release();
 	gCommandQueues[2].Release();
 
-	for (int i = 0; i < NUM_THREADS; ++i) {
-		gAllocatorsAndLists[i][0].Release();
-		gAllocatorsAndLists[i][1].Release();
-		gAllocatorsAndLists[i][2].Release();
+	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
+		for (int j = 0; j < NUM_STAGES_IN_FRAME; ++j) {
+			gAllocatorsAndLists[i][j].Release();
+		}
 	}
 
 	//gGraphicsQueue.Release();
@@ -151,8 +142,8 @@ void Project::Shutdown()
 	SafeRelease(&gSwapChainRenderTargetsDescHeap);
 	for (int i = 0; i < NUM_SWAP_BUFFERS; i++)
 	{
-		SafeRelease(&gDescriptorHeap[i]);
-		SafeRelease(&gConstantBufferResource[i]);
+		SafeRelease(&gConstantBufferDescriptorHeap);
+		SafeRelease(&gConstantBufferResource);
 		
 		
 		gPerFrameResources[i].Release();
@@ -245,22 +236,19 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 	D3D12_COMMAND_QUEUE_DESC cqd = {};
 
 	cqd.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-	gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QUEUE_TYPE_DIRECT].mQueue));
-
-	cqd.Type = D3D12_COMMAND_LIST_TYPE_COPY;
-	gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QUEUE_TYPE_COPY].mQueue));
+	gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QT_DIR].mQueue));
 
 	cqd.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
-	gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue));
+	gDevice5->CreateCommandQueue(&cqd, IID_PPV_ARGS(&gCommandQueues[QT_COMP].mQueue));
 
 
 	//Create command allocator. The command allocator object corresponds
 	//to the underlying allocations in which GPU commands are stored.
 	//Create command list.
-	for (int i = 0; i < NUM_THREADS; ++i) {
-		gAllocatorsAndLists[i][0].CreateCommandListAndAllocator(QUEUE_TYPE_DIRECT, gDevice5);
-		gAllocatorsAndLists[i][1].CreateCommandListAndAllocator(QUEUE_TYPE_COPY, gDevice5);
-		gAllocatorsAndLists[i][2].CreateCommandListAndAllocator(QUEUE_TYPE_COMPUTE, gDevice5);
+	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
+		gAllocatorsAndLists[i][GEOMETRY_STAGE].CreateCommandListAndAllocator(QT_DIR, gDevice5);
+		gAllocatorsAndLists[i][FXAA_STAGE].CreateCommandListAndAllocator(QT_COMP, gDevice5);
+		gAllocatorsAndLists[i][PRESENT_STAGE].CreateCommandListAndAllocator(QT_DIR, gDevice5);
 	}
 
 	IDXGIFactory5*	factory = nullptr;
@@ -284,7 +272,7 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 	IDXGISwapChain1* swapChain1 = nullptr;
 	
 	HRESULT hr = factory->CreateSwapChainForHwnd(
-		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue,
+		gCommandQueues[QT_DIR].mQueue,
 		wndHandle,
 		&scDesc,
 		nullptr,
@@ -357,9 +345,9 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 
 void Project::CreateFenceAndEventHandle()
 {
-	gCommandQueues[QUEUE_TYPE_DIRECT].CreateFenceAndEventHandle(gDevice5);
-	gCommandQueues[QUEUE_TYPE_COPY].CreateFenceAndEventHandle(gDevice5);
-	gCommandQueues[QUEUE_TYPE_COMPUTE].CreateFenceAndEventHandle(gDevice5);
+	gCommandQueues[QT_DIR].CreateFenceAndEventHandle(gDevice5);
+	//x gCommandQueues[QUEUE_TYPE_COPY].CreateFenceAndEventHandle(gDevice5);
+	gCommandQueues[QT_COMP].CreateFenceAndEventHandle(gDevice5);
 
 	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
 		gPerFrameResources[i].CreateFenceAndEventHandle(gDevice5);
@@ -411,24 +399,9 @@ void Project::CreateShadersAndPipelineStates()
 	GPUStages[1]->Init(gDevice5, gRootSignature);
 }
 
-
-void Project::CreateTriangleData()
+/// Uploads the mesh to the GPU via an upload heap and copies it to a default heap
+void Project::UploadMeshData()
 {
-	//Vertex triangleVertices[6] =
-	//{	
-	//	{ -0.05f, -0.05f, 0.0f, 1.0f },
-	//	{-0.05f,0.05f,0.0f,1.0f},
-	//	{0.05f,-0.05f,0.0f,1.0f},
-
-	//	{-0.05f,0.05f,0.0f,1.0f},
-	//	{0.05f,0.05f,0.0f,1.0f},
-	//	{ 0.05f, -0.05f, 0.0f, 1.0f }
-
-	//};
-	//Note: using upload heaps to transfer static data like vert buffers is not 
-	//recommended. Every time the GPU needs it, the upload heap will be marshalled 
-	//over. Please read up on Default Heap usage. An upload heap is used here for 
-	//code simplicity and because there are very few vertices to actually transfer.
 	D3D12_HEAP_PROPERTIES hp = {};
 	hp.Type				= D3D12_HEAP_TYPE_DEFAULT;
 	hp.CreationNodeMask = 1;
@@ -512,9 +485,9 @@ void Project::CreateTriangleData()
 	gNormalStagingBufferResource->Map(0, &range, &dataBegin);
 	memcpy(dataBegin, normalVertices, sizeof(normalVertices));
 	gNormalStagingBufferResource->Unmap(0, nullptr);
-	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->Reset(gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mAllocator, NULL);
-	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->CopyBufferRegion(gVertexBufferResource, 0, gVertexStagingBufferResource, 0, sizeof(triangleVertices));
-	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->CopyBufferRegion(gVertexBufferNormalResource, 0, gNormalStagingBufferResource, 0, sizeof(triangleVertices));
+	gAllocatorsAndLists[0][GEOMETRY_STAGE].mCommandList->Reset(gAllocatorsAndLists[0][GEOMETRY_STAGE].mAllocator, NULL);
+	gAllocatorsAndLists[0][GEOMETRY_STAGE].mCommandList->CopyBufferRegion(gVertexBufferResource, 0, gVertexStagingBufferResource, 0, sizeof(triangleVertices));
+	gAllocatorsAndLists[0][GEOMETRY_STAGE].mCommandList->CopyBufferRegion(gVertexBufferNormalResource, 0, gNormalStagingBufferResource, 0, sizeof(triangleVertices));
 
 	D3D12_RESOURCE_BARRIER barrierDesc{};
 	barrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -523,10 +496,10 @@ void Project::CreateTriangleData()
 	barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
 	barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
 
-	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->ResourceBarrier(1, &barrierDesc);
+	gAllocatorsAndLists[0][GEOMETRY_STAGE].mCommandList->ResourceBarrier(1, &barrierDesc);
 
 	barrierDesc.Transition.pResource = gVertexBufferNormalResource;
-	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->ResourceBarrier(1, &barrierDesc);
+	gAllocatorsAndLists[0][GEOMETRY_STAGE].mCommandList->ResourceBarrier(1, &barrierDesc);
 
 	//Initialize vertex buffer view, used in the render call.
 	gVertexBufferView[0].BufferLocation = gVertexBufferResource->GetGPUVirtualAddress();
@@ -536,10 +509,14 @@ void Project::CreateTriangleData()
 	gVertexBufferView[1].StrideInBytes = sizeof(float4);
 	gVertexBufferView[1].SizeInBytes = sizeof(normalVertices);
 
-	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->Close();
-	std::vector<ID3D12CommandList*> ppCommandLists{ gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList };
+
+	// todo: wait for execution to be completed before continuing
+	gAllocatorsAndLists[0][GEOMETRY_STAGE].mCommandList->Close();
+	std::vector<ID3D12CommandList*> ppCommandLists{ gAllocatorsAndLists[0][GEOMETRY_STAGE].mCommandList };
 	gCommandQueues[0].mQueue->ExecuteCommandLists(static_cast<UINT>(ppCommandLists.size()), ppCommandLists.data());
-	gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mCommandList->Reset(gAllocatorsAndLists[0][QUEUE_TYPE_DIRECT].mAllocator, NULL);
+	
+	gCommandQueues[QT_DIR].WaitForGpu();
+	//gAllocatorsAndLists[0][QT_DIR].mCommandList->Reset(gAllocatorsAndLists[0][QT_DIR].mAllocator, NULL);
 
 }
 
@@ -766,14 +743,14 @@ void Project::CreateComputeShaderResources()
 // todo remove unused stuff
 void Project::CreateConstantBufferResources()
 {
-	for (int i = 0; i < NUM_SWAP_BUFFERS; i++)
-	{
+	//for (int i = 0; i < NUM_SWAP_BUFFERS; i++)
+	//{
 		D3D12_DESCRIPTOR_HEAP_DESC heapDescriptorDesc = {};
 		heapDescriptorDesc.NumDescriptors = TOTAL_DRAGONS;
 		heapDescriptorDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		heapDescriptorDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		gDevice5->CreateDescriptorHeap(&heapDescriptorDesc, IID_PPV_ARGS(&gDescriptorHeap[i]));
-	}
+		gDevice5->CreateDescriptorHeap(&heapDescriptorDesc, IID_PPV_ARGS(&gConstantBufferDescriptorHeap));
+	//}
 
 	//UINT cbSizeAligned = (sizeof(ConstantBuffer) + 255) & ~255;	// 256-byte aligned CB.
 
@@ -800,17 +777,17 @@ void Project::CreateConstantBufferResources()
 	//hDesc.Flags = D3D12_HEAP_FLAG_NONE;
 
 	//Create a resource heap, descriptor heap, and pointer to cbv for each frame
-	for (int i = 0; i < NUM_SWAP_BUFFERS; i++)
-	{
+	//for (int i = 0; i < NUM_SWAP_BUFFERS; i++)
+	//{
 		if (SUCCEEDED(gDevice5->CreateCommittedResource(
 			&heapProperties,
 			D3D12_HEAP_FLAG_NONE,
 			&resourceDesc,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
-			IID_PPV_ARGS(&gConstantBufferResource[i]))))
+			IID_PPV_ARGS(&gConstantBufferResource))))
 		{
-			if (SUCCEEDED(gConstantBufferResource[i]->Map(0, 0, (void**)&mGameStateHandler.pMappedCB[i])))
+			if (SUCCEEDED(gConstantBufferResource->Map(0, 0, (void**)&mGameStateHandler.pMappedCB)))
 			{
 				//memcpy(pMappedCB[index], cbData, sizeof(cbData));
 			}
@@ -838,7 +815,7 @@ void Project::CreateConstantBufferResources()
 		//	gDevice5->CreateConstantBufferView(&cbvDesc, cdh);
 		//	cdh.ptr+=gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 		//}
-	}
+	//}
 }
 
 void Project::CopyComputeOutputToBackBuffer(UINT64 frameIndex, int swapBufferIndex, int threadIndex)
@@ -849,8 +826,8 @@ void Project::CopyComputeOutputToBackBuffer(UINT64 frameIndex, int swapBufferInd
 	
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
-	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[threadIndex][QUEUE_TYPE_DIRECT].mAllocator;
-	D3D12GraphicsCommandListPtr directList = gAllocatorsAndLists[threadIndex][QUEUE_TYPE_DIRECT].mCommandList;
+	ID3D12CommandAllocator* directAllocator = gAllocatorsAndLists[swapBufferIndex][PRESENT_STAGE].mAllocator;
+	D3D12GraphicsCommandListPtr directList = gAllocatorsAndLists[swapBufferIndex][PRESENT_STAGE].mCommandList;
 
 
 	directAllocator->Reset();
@@ -900,15 +877,17 @@ void Project::CopyComputeOutputToBackBuffer(UINT64 frameIndex, int swapBufferInd
 
 
 	// Wait for the FXAA stage to be finished
-	if (gThreadFences[threadIndex]->GetCompletedValue() < gThreadFenceValues[threadIndex]) {
-		gThreadFences[threadIndex]->SetEventOnCompletion(gThreadFenceValues[threadIndex], gThreadFenceEvents[threadIndex]);
-		WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
-	}
+	//if (gThreadFences[threadIndex]->GetCompletedValue() < gThreadFenceValues[threadIndex]) {
+	//	gThreadFences[threadIndex]->SetEventOnCompletion(gThreadFenceValues[threadIndex], gThreadFenceEvents[threadIndex]);
+	//	WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
+	//}
 
+
+	gCommandQueues[QT_DIR].mQueue->Wait(gThreadFences[threadIndex], gThreadFenceValues[threadIndex]);
 
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute2[] = { directList };
-	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
+	gCommandQueues[QT_DIR].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
 }
 
 void Project::Render(int id)
@@ -946,10 +925,10 @@ void Project::Render(int id)
 
 	if (isRunning) {
 		// Update the index used by the CPU update loop
-		mLatestBackBufferIndex = 0;// swapBufferIndex;
+		//mLatestBackBufferIndex = 0;// swapBufferIndex;
 
 		PerFrameResources* perFrame = &gPerFrameResources[swapBufferIndex];
-		PerThreadFenceHandle* perThread = &gPerThreadFenceHandles[threadIndex];
+		//PerThreadFenceHandle* perThread = &gPerThreadFenceHandles[threadIndex];
 
 
 		////////// Render geometry section //////////
@@ -959,7 +938,7 @@ void Project::Render(int id)
 
 		// Signal that the geometry stage is finished
 		UINT64 threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
-		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
+		gCommandQueues[QT_DIR].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
 
 		// Begin the rendering of the next frame once the first part of this frame is done.
 		gThreadPool->push([this](int id) {Render(id); });
@@ -973,7 +952,7 @@ void Project::Render(int id)
 
 		// Signal that the FXAA stage is finished
 		threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
-		gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
+		gCommandQueues[QT_COMP].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
 
 
 		////////// Present section //////////
@@ -983,6 +962,8 @@ void Project::Render(int id)
 			gBackBufferFence->SetEventOnCompletion(frameIndex, gBackBufferFenceEvent[swapBufferIndex]);
 			WaitForSingleObject(gBackBufferFenceEvent[swapBufferIndex], INFINITE);
 		}
+		//gCommandQueues[QT_DIR].mQueue->Wait(gBackBufferFence, frameIndex);
+
 
 		// Lock this section since if Present is called in another thread whilst in this section the backbufferIndex 
 		// used in CopyComputeOutputToBackBuffer() becomes invalid and the application crashes
@@ -991,12 +972,13 @@ void Project::Render(int id)
 		// Copy the result of the FXAA compute shader to the back buffer
 		CopyComputeOutputToBackBuffer(frameIndex, swapBufferIndex, threadIndex);
 
-		// Signal that the frame with frameIndex+1 can enter the present section after this one is done
-		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gBackBufferFence, frameIndex + 1);
 
 		// Present the frame.
 		DXGI_PRESENT_PARAMETERS pp = {};
 		gSwapChain4->Present1(0, DXGI_PRESENT_ALLOW_TEARING, &pp);
+
+		// Signal that the frame with frameIndex+1 can enter the present section after this one is done
+		gCommandQueues[QT_DIR].mQueue->Signal(gBackBufferFence, frameIndex + 1);
 
 		gPresentLock.unlock();
 	}
