@@ -91,7 +91,7 @@ void Project::Start()
 	gThreadPool->push([this](int id) {mGameStateHandler.Update(id); });
 	gThreadPool->push([this](int id) {this->Render(id); });
 #ifdef RECORD_TIME
-	gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->GetClockCalibration(&mClockCalibration.gpuTimeStamp, &mClockCalibration.cpuTimeStamp);
+	gCommandQueues[QT_DIR].mQueue->GetClockCalibration(&mClockCalibration.gpuTimeStamp, &mClockCalibration.cpuTimeStamp);
 #endif
 }
 
@@ -986,7 +986,7 @@ void Project::Render(int id)
 	if (frameIndex == FIRST_TIMESTAMPED_FRAME + 2*NUM_TIMESTAMP_PAIRS) {
 		UINT64 gpuEpoch = mClockCalibration.gpuTimeStamp;
 		UINT64 gpuFreq;
-		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->GetTimestampFrequency(&gpuFreq);
+		gCommandQueues[QT_DIR].mQueue->GetTimestampFrequency(&gpuFreq);
 		double gpuTimestampToMs = (1.0 / gpuFreq) * 1'000.0;
 
 		UINT64 cpuEpoch = mClockCalibration.cpuTimeStamp;
