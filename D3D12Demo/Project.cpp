@@ -1001,7 +1001,7 @@ void Project::Render(int id)
 		gPresentLock.unlock();
 	}
 #ifdef RECORD_TIME
-	if (frameIndex == FIRST_TIMESTAMPED_FRAME + NUM_TIMESTAMP_PAIRS - 1) {
+	if (frameIndex == FIRST_TIMESTAMPED_FRAME + 2*NUM_TIMESTAMP_PAIRS) {
 		UINT64 gpuEpoch = mClockCalibration.gpuTimeStamp;
 		UINT64 gpuFreq;
 		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->GetTimestampFrequency(&gpuFreq);

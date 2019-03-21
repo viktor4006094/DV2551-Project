@@ -12,7 +12,7 @@
 
 const unsigned int NUM_THREADS = 10;
 
-const unsigned int MAX_FRAME_LATENCY = 3;
+const unsigned int MAX_FRAME_LATENCY = 1;
 
 // TOTAL_TRIS pretty much decides how many drawcalls in a brute force approach.
 constexpr int TOTAL_DRAGONS = 104; //todo rename
@@ -38,7 +38,7 @@ static std::mutex gBufferTransferLock;
 static std::mutex gPresentLock;
 
 const unsigned int FIRST_TIMESTAMPED_FRAME = 1;
-const unsigned int NUM_TIMESTAMP_PAIRS = 10;
+const unsigned int NUM_TIMESTAMP_PAIRS = 20;
 
 #ifdef VETTIG_DATOR
 typedef ID3D12Device5* D3D12DevPtr;
