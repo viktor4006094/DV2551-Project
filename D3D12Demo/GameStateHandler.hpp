@@ -10,7 +10,7 @@ public:
 	GameStateHandler();
 	~GameStateHandler();
 
-	void CreateMeshes();
+	void CreatePerMeshData();
 	void ShutDown();
 	void Update(int id, UINT* currentFrameIndex);
 

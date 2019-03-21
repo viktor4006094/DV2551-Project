@@ -111,11 +111,11 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
-	ID3D12CommandAllocator* directAllocator = p->gAllocatorsAndLists[threadIndex][QUEUE_TYPE_DIRECT].mAllocator;
-	D3D12GraphicsCommandListPtr	directList = p->gAllocatorsAndLists[threadIndex][QUEUE_TYPE_DIRECT].mCommandList;
+	ID3D12CommandAllocator* directAllocator = p->gAllocatorsAndLists[threadIndex][QT_DIR].mAllocator;
+	D3D12GraphicsCommandListPtr	directList = p->gAllocatorsAndLists[threadIndex][QT_DIR].mCommandList;
 
-	ID3D12Fence1* fence = p->gCommandQueues[QUEUE_TYPE_DIRECT].mFence;
-	HANDLE eventHandle = p->gAllocatorsAndLists[threadIndex][QUEUE_TYPE_DIRECT].mEventHandle;
+	ID3D12Fence1* fence = p->gCommandQueues[QT_DIR].mFence;
+	HANDLE eventHandle = p->gAllocatorsAndLists[threadIndex][QT_DIR].mEventHandle;
 
 	////! since WaitForGPU is called just before the commandlist is executed in the previous frame this does 
 	////! not need to be done here since the command allocator is already guaranteed to have finished executing
@@ -238,5 +238,5 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute[] = { directList };
-	p->gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
+	p->gCommandQueues[QT_DIR].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
 }

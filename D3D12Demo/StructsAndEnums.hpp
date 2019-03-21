@@ -59,9 +59,8 @@ inline void CountFPS(HWND wndHandle)
 
 #pragma region Enums
 enum QueueType : size_t {
-	QUEUE_TYPE_DIRECT = 0,
-	QUEUE_TYPE_COPY = 1,
-	QUEUE_TYPE_COMPUTE = 2
+	QT_DIR = 0,
+	QT_COMP = 1
 };
 #pragma endregion
 
@@ -241,8 +240,7 @@ struct CommandAllocatorAndList
 	void CreateCommandListAndAllocator(QueueType type, D3D12DevPtr dev)
 	{
 		D3D12_COMMAND_LIST_TYPE listType = D3D12_COMMAND_LIST_TYPE_DIRECT;
-		if (type == QUEUE_TYPE_COPY) { listType = D3D12_COMMAND_LIST_TYPE_COPY; }
-		if (type == QUEUE_TYPE_COMPUTE) { listType = D3D12_COMMAND_LIST_TYPE_COMPUTE; }
+		if (type == QT_COMP) { listType = D3D12_COMMAND_LIST_TYPE_COMPUTE; }
 
 		dev->CreateCommandAllocator(
 			listType,

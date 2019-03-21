@@ -48,7 +48,7 @@ public:
 
 	void CreateShadersAndPipelineStates();						//7. Set up the pipeline states
 
-	void CreateTriangleData();									//8. Create vertexdata
+	void UploadMeshData();									//8. Create vertexdata
 	void CreateRootSignature();
 	void CreateComputeShaderResources();
 	void CreateConstantBufferResources();
@@ -72,8 +72,8 @@ public:
 	PerFrameResources gPerFrameResources[NUM_SWAP_BUFFERS] = {};
 
 
-	CommandQueueAndFence gCommandQueues[3];
-	CommandAllocatorAndList gAllocatorsAndLists[NUM_THREADS][3];
+	CommandQueueAndFence gCommandQueues[2]; // One Direct and one Compute
+	CommandAllocatorAndList gAllocatorsAndLists[NUM_THREADS][2];
 
 	PerThreadFenceHandle gPerThreadFenceHandles[NUM_THREADS] = {};
 
@@ -83,13 +83,6 @@ public:
 	UINT64 gThreadFenceValues[NUM_THREADS] = { 0 };
 	HANDLE gThreadFenceEvents[NUM_THREADS] = { nullptr };
 	ID3D12Fence1* gThreadFences[NUM_THREADS] = { nullptr };
-
-
-	//UINT64 gSwapBufferFenceValues[NUM_SWAP_BUFFERS] = { 0 };
-	////UINT64 gSwapBufferWaitValues[NUM_SWAP_BUFFERS] = { 0 };
-	//HANDLE gSwapBufferFenceEvents[NUM_SWAP_BUFFERS] = { nullptr };
-	//ID3D12Fence1* gSwapBufferFences[NUM_SWAP_BUFFERS] = { nullptr };
-
 
 	// ensures that frames are presented in the correct order
 	UINT64 gBackBufferFenceValue = 0;

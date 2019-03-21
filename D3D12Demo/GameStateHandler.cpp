@@ -13,7 +13,7 @@ GameStateHandler::~GameStateHandler()
 
 }
 
-void GameStateHandler::CreateMeshes()
+void GameStateHandler::CreatePerMeshData()
 {
 	for (int i = 0; i < TOTAL_DRAGONS; ++i) {
 		switch (i) {
