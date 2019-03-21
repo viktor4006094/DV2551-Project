@@ -74,24 +74,14 @@ void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 
 void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, Project* p)
 {
-	//UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
-	//UINT backBufferIndex = index;
-	
-	PerFrameResources* perFrame = &p->gPerFrameResources[swapBufferIndex];
-
-	//Command list allocators can only be reset when the associated command lists have
-	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
-
-	ID3D12CommandAllocator* computeAllocator = p->gAllocatorsAndLists[swapBufferIndex][FXAA_STAGE].mAllocator;
-	D3D12GraphicsCommandListPtr computeList  = p->gAllocatorsAndLists[swapBufferIndex][FXAA_STAGE].mCommandList;
-
+	PerFrame* frame = &p->gPerFrameAllocatorsListsAndResources[swapBufferIndex];
+	ID3D12CommandAllocator*     compAllo = frame->mAllocatorsAndLists[FXAA_STAGE].mAllocator;
+	D3D12GraphicsCommandListPtr compList = frame->mAllocatorsAndLists[FXAA_STAGE].mCommandList;
 
 	//// Compute shader part ////
 
-	//p->gCommandQueues[QUEUE_TYPE_COMPUTE].WaitForGpu();
-
-	computeAllocator->Reset();
-	computeList->Reset(computeAllocator, mPipelineState);
+	compAllo->Reset();
+	compList->Reset(compAllo, mPipelineState);
 	
 #ifdef RECORD_TIME
 	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
@@ -99,54 +89,50 @@ void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, 
 		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][1].Start);
 
 		// timer start
-		p->gpuTimer[1].start(computeList, arrIndex);
+		p->gpuTimer[1].start(compList, arrIndex);
 	}
 #endif
 	//Set root signature
-	computeList->SetComputeRootSignature(p->gRootSignature);
+	compList->SetComputeRootSignature(p->gRootSignature);
 
 	// Set the correct state for the input, will be set to common between queue types
-	SetResourceTransitionBarrier(computeList, perFrame->gIntermediateRenderTarget,
+	SetResourceTransitionBarrier(compList, frame->gIntermediateRenderTarget,
 		D3D12_RESOURCE_STATE_COMMON,
 		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
 	);
 
 
 	ID3D12DescriptorHeap* dheap1[] = { p->gComputeDescriptorHeap };
-	computeList->SetDescriptorHeaps(_countof(dheap1), dheap1);
+	compList->SetDescriptorHeaps(_countof(dheap1), dheap1);
 
 	D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
 	// todo save increment size
 	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*swapBufferIndex;
-	computeList->SetComputeRootDescriptorTable(2, gdh);
+	compList->SetComputeRootDescriptorTable(2, gdh);
 	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*(NUM_SWAP_BUFFERS - swapBufferIndex);
 	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*swapBufferIndex;
-	computeList->SetComputeRootDescriptorTable(1, gdh);
+	compList->SetComputeRootDescriptorTable(1, gdh);
 
 
-	SetResourceTransitionBarrier(computeList, perFrame->gUAVResource,
+	SetResourceTransitionBarrier(compList, frame->gUAVResource,
 		D3D12_RESOURCE_STATE_COPY_SOURCE,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
 	);
 
 
-
 	static const UINT squaresWide = SCREEN_WIDTH / 32U + 1;
 	static const UINT squaresHigh = SCREEN_HEIGHT / 32U + 1;
 
-	computeList->Dispatch(squaresWide, squaresHigh, 1);
+	compList->Dispatch(squaresWide, squaresHigh, 1);
 
-
-	//SetUAVTransitionBarrier(computeList, perFrame->gUAVResource);
-
-	SetResourceTransitionBarrier(computeList, perFrame->gUAVResource,
+	SetResourceTransitionBarrier(compList, frame->gUAVResource,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 		D3D12_RESOURCE_STATE_COMMON
 	);
 
 
 	// set state to common since this is used in by the direct queue as well
-	SetResourceTransitionBarrier(computeList, perFrame->gIntermediateRenderTarget,
+	SetResourceTransitionBarrier(compList, frame->gIntermediateRenderTarget,
 		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
 		D3D12_RESOURCE_STATE_COMMON
 	);
@@ -156,21 +142,21 @@ void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, 
 	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
 		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
 		// timer end
-		p->gpuTimer[1].stop(computeList, arrIndex);
-		p->gpuTimer[1].resolveQueryToCPU(computeList, arrIndex);
+		p->gpuTimer[1].stop(compList, arrIndex);
+		p->gpuTimer[1].resolveQueryToCPU(compList, arrIndex);
 
 		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][1].Stop);
 	}
 #endif
 
 	//Close the list to prepare it for execution.
-	computeList->Close();
+	compList->Close();
 
 
 	// Wait for the geometry stage to be finished
-	p->gCommandQueues[QT_COMP].mQueue->Wait(p->gThreadFences[threadIndex], p->gThreadFenceValues[threadIndex]);
+	p->gCommandQueues[QT_COMP]->Wait(p->gSwapBufferFences[swapBufferIndex], p->gSwapBufferFenceValues[swapBufferIndex]);
 
 	//Execute the command list.
-	ID3D12CommandList* listsToExecute2[] = { computeList };
-	p->gCommandQueues[QT_COMP].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
+	ID3D12CommandList* listsToExecute2[] = { compList };
+	p->gCommandQueues[QT_COMP]->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
 }

@@ -63,7 +63,7 @@ void GameStateHandler::ShutDown()
 	isRunning = false;
 }
 
-// todo remove currentFrameIndex, use only one constantbuffer on the gpu
+
 void GameStateHandler::Update(int id)
 {
 	static auto startTime = std::chrono::high_resolution_clock::now();
@@ -109,26 +109,8 @@ void GameStateHandler::Update(int id)
 			dshift += delta * gMovementSpeed;
 			startTime = std::chrono::high_resolution_clock::now();
 
-			//copy updated gamestate to bufferstate
-			//gBufferTransferLock.lock();
-
-			//todo? copy it to the next frames buffer, 
+			//copy updated gamestate to mapped memory so that the GPU can access it when needed
 			memcpy((void*)pMappedCB, cbData, sizeof(cbData));
-
-			//bufferState = writeState;
-			//gBufferTransferLock.unlock();
 		}
 	}
 }
-
-//void GameStateHandler::writeNewestGameStateToReadOnlyAtIndex(int index)
-//{
-//	//gBufferTransferLock.lock();
-//	////readOnlyState[index] = bufferState;
-//	//gBufferTransferLock.unlock();
-//}
-//
-//GameState* GameStateHandler::getReadOnlyStateAtIndex(int index)
-//{
-//	return &readOnlyState[index];
-//}

@@ -32,10 +32,9 @@ public:
 	void Stop();
 	void Shutdown();
 
-	void WaitForGpu(QueueType type);
 	void CreateDirect3DDevice(HWND wndHandle);
 	void CreateCommandInterfacesAndSwapChain(HWND wndHandle);
-	void CreateFenceAndEventHandle();
+	void CreateFencesAndEventHandles();
 	void CreateRenderTargets();
 	void CreateViewportAndScissorRect();
 	void CreateShadersAndPipelineStates();
@@ -51,6 +50,8 @@ public:
 	void* operator new(size_t i)   { return _mm_malloc(i, 256); }
 	void  operator delete(void* p) { _mm_free(p); }
 
+
+
 	/// Global
 	ctpl::thread_pool* gThreadPool = nullptr;
 	GameStateHandler mGameStateHandler;
@@ -58,21 +59,16 @@ public:
 	HWND mWndHandle;
 	
 	/// Global D3D
-	D3D12DevPtr gDevice5 = nullptr; // ID3D12Device
+	D3D12DevPtr				gDevice5 = nullptr; // ID3D12Device
 
-	CommandQueueAndFence gCommandQueues[2]; // One Direct and one Compute queue
-	ID3D12RootSignature* gRootSignature = nullptr; // only one root signature needed
+	ID3D12CommandQueue*		gCommandQueues[2];			// One Direct and one Compute queue
+	ID3D12RootSignature*	gRootSignature = nullptr;	// only one root signature needed
 
-	IDXGISwapChain4* gSwapChain4 = nullptr;
-	HANDLE gSwapChainWaitableObject = nullptr;
+	IDXGISwapChain4*		gSwapChain4	             = nullptr;
+	HANDLE					gSwapChainWaitableObject = nullptr;
 	
-	D3D12_VIEWPORT	gViewport = {};
-	D3D12_RECT		gScissorRect = {};
-
-	// ensures that frames are presented in the correct order
-	ID3D12Fence1* gBackBufferFence = nullptr;
-	HANDLE gBackBufferFenceEvent[NUM_SWAP_BUFFERS] = { nullptr };
-	UINT64 gBackBufferFenceValue = 0;
+	D3D12_VIEWPORT			gViewport    = {};
+	D3D12_RECT				gScissorRect = {};
 
 	// Constant buffers
 	ID3D12DescriptorHeap*	gConstantBufferDescriptorHeap = nullptr;
@@ -87,58 +83,43 @@ public:
 	/// Per swap buffer
 	ID3D12DescriptorHeap*	gIntermediateRenderTargetsDescHeap   = nullptr; // Descriptor heap for the RTVs used by the geometry stage
 	ID3D12DescriptorHeap*	gComputeDescriptorHeap				 = nullptr; // Descriptor heap for the UAVs and SRVs used by the geometry stage
-	PerFrameResources		gPerFrameResources[NUM_SWAP_BUFFERS] = {};      // texture resources used for each frame RTV/SRV and UAV
-	
-																			// render targets used as the final backbuffer of the frame
+
+	// Each swap buffer has its own commandlists, allocators, RTV/SRV, and UAV
+	PerFrame				gPerFrameAllocatorsListsAndResources[NUM_SWAP_BUFFERS];
+
+	// render targets used as the final backbuffer of the frame
 	ID3D12DescriptorHeap*	gSwapChainRenderTargetsDescHeap = nullptr;
 	ID3D12Resource1*		gSwapChainRenderTargets[NUM_SWAP_BUFFERS] = {};
 	UINT					gRenderTargetDescriptorSize = 0;
 
 
-	/// Per Thread
-	CommandAllocatorAndList gAllocatorsAndLists[NUM_SWAP_BUFFERS][NUM_STAGES_IN_FRAME]; // Each thread has their own commandlists and allocators
-	
-	// Fences used within frames for synchronization between the direct and compute queue
-	ID3D12Fence1* gThreadFences[NUM_THREADS] = { nullptr };
-	HANDLE gThreadFenceEvents[NUM_THREADS]   = { nullptr };
-	UINT64 gThreadFenceValues[NUM_THREADS]   = { 0 };
-
-
-
 	/// Mesh data
 	ID3D12Resource1*			gVertexBufferResource = nullptr;
 	ID3D12Resource1*			gVertexBufferNormalResource = nullptr;
-	D3D12_VERTEX_BUFFER_VIEW	gVertexBufferView[2] = {};
+	D3D12_VERTEX_BUFFER_VIEW	gVertexBufferViews[2] = {};
 	ID3D12Resource1*			gVertexStagingBufferResource = nullptr;
 	ID3D12Resource1*			gNormalStagingBufferResource = nullptr;
 	
-	
 
-	//todo----------------------------------------------------------------------------------------------------------------------------------------------------------------
+	/// Fences
 
+	// ensures that frames are presented in the correct order
+	ID3D12Fence1* gBackBufferFence = nullptr;
+	HANDLE gBackBufferFenceEvent[NUM_SWAP_BUFFERS] = { nullptr };
 
-
-
-	//x UINT mLatestBackBufferIndex = 0;
-
-
-
-
+	// Fences used within frames for synchronization between the direct and compute queue
+	ID3D12Fence1* gSwapBufferFences[NUM_SWAP_BUFFERS] = { nullptr };
+	UINT64 gSwapBufferFenceValues[NUM_SWAP_BUFFERS]   = { 0 };
 
 	bool isRunning = true;
 
-
-	D3D12::D3D12Timer gpuTimer[3];
 #ifdef RECORD_TIME
+	D3D12::D3D12Timer gpuTimer[3];
 
 	struct CPUTimeStampPair
 	{
 		LARGE_INTEGER Start;
 		LARGE_INTEGER Stop;
-		//double Start;
-		//double Stop;
-		//std::chrono::high_resolution_clock::time_point Start;
-		//std::chrono::high_resolution_clock::time_point Stop;
 	};
 
 	struct ClockCalibration
@@ -152,7 +133,6 @@ public:
 
 
 private:
-
 	GPUStage* GPUStages[2];
 
 };

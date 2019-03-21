@@ -103,31 +103,13 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 {
 	static size_t lastRenderIterationIndex = 0;
 
-	//UINT backBufferIndex = p->gSwapChain4->GetCurrentBackBufferIndex();
-	//UINT backBufferIndex = index;
+	PerFrame* frame = &p->gPerFrameAllocatorsListsAndResources[swapBufferIndex];
+	ID3D12CommandAllocator*     dirAllo = frame->mAllocatorsAndLists[GEOMETRY_STAGE].mAllocator;
+	D3D12GraphicsCommandListPtr dirList = frame->mAllocatorsAndLists[GEOMETRY_STAGE].mCommandList;
 	
-	PerFrameResources* perFrame = &p->gPerFrameResources[swapBufferIndex];
 
-
-	//Command list allocators can only be reset when the associated command lists have
-	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
-	ID3D12CommandAllocator* directAllocator = p->gAllocatorsAndLists[swapBufferIndex][GEOMETRY_STAGE].mAllocator;
-	D3D12GraphicsCommandListPtr	directList = p->gAllocatorsAndLists[swapBufferIndex][GEOMETRY_STAGE].mCommandList;
-
-	ID3D12Fence1* fence = p->gCommandQueues[QT_DIR].mFence;
-	//x HANDLE eventHandle = p->gAllocatorsAndLists[threadIndex][QT_DIR].mEventHandle;
-
-	////! since WaitForGPU is called just before the commandlist is executed in the previous frame this does 
-	////! not need to be done here since the command allocator is already guaranteed to have finished executing
-	//// wait for previous usage of this command allocator to be done executing before it is reset
-	//UINT64 prevFence = gAllocatorsAndLists[index][QUEUE_TYPE_DIRECT].mLastFrameWithThisAllocatorFenceValue;
-	//if (fence->GetCompletedValue() < prevFence) {
-	//	fence->SetEventOnCompletion(prevFence, eventHandle);
-	//	WaitForSingleObject(eventHandle, INFINITE);
-	//}
-
-	directAllocator->Reset();
-	directList->Reset(directAllocator, mPipelineState);
+	dirAllo->Reset();
+	dirList->Reset(dirAllo, mPipelineState);
 
 #ifdef RECORD_TIME
 	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
@@ -135,16 +117,16 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][0].Start);
 
 		// timer start
-		p->gpuTimer[0].start(directList, arrIndex);
+		p->gpuTimer[0].start(dirList, arrIndex);
 	}
 #endif
 
 	//Set root signature
-	directList->SetGraphicsRootSignature(p->gRootSignature);
+	dirList->SetGraphicsRootSignature(p->gRootSignature);
 
 
 	// Indicate that the intermediate buffer will be used as a render target
-	SetResourceTransitionBarrier(directList, perFrame->gIntermediateRenderTarget,
+	SetResourceTransitionBarrier(dirList, frame->gIntermediateRenderTarget,
 		D3D12_RESOURCE_STATE_COMMON,
 		D3D12_RESOURCE_STATE_RENDER_TARGET
 	);
@@ -157,63 +139,37 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 
 	// get a handle to the depth/stencil buffer
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvh = p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	directList->ClearDepthStencilView(p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	dirList->ClearDepthStencilView(p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
 	// set and clear render targets and depth stencil
-	float clearColor[4] = { 0.0f,0.0f,0.0f,1.0f };
-	directList->OMSetRenderTargets(1, &cdh, false, &dsvh);
-	//directList->ClearRenderTargetView(cdh,clearColor, 0, nullptr);
-	//directList->OMSetRenderTargets(1, &cdh, true, nullptr);
-	directList->ClearRenderTargetView(cdh, gClearColor, 0, nullptr);
-
-
+	dirList->OMSetRenderTargets(1, &cdh, false, &dsvh);
+	dirList->ClearRenderTargetView(cdh, gClearColor, 0, nullptr);
 
 
 	//Set root signature
-	directList->SetGraphicsRootSignature(p->gRootSignature);
+	dirList->SetGraphicsRootSignature(p->gRootSignature);
 
 	//Set necessary states.
-	directList->RSSetViewports(1, &p->gViewport);
-	directList->RSSetScissorRects(1, &p->gScissorRect);
+	dirList->RSSetViewports(1, &p->gViewport);
+	dirList->RSSetScissorRects(1, &p->gScissorRect);
+
+	// Set the vertex buffers (positions and normals)
+	dirList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	dirList->IASetVertexBuffers(0, 2, p->gVertexBufferViews);
 
 
-
-	directList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	directList->IASetVertexBuffers(0, 2, p->gVertexBufferView);
-
-	//get the current game state
-
-	//->mGameStateHandler.writeNewestGameStateToReadOnlyAtIndex(index);
-	/*gBufferTransferLock.lock();
-	readOnlyState[index] = bufferState;
-	gBufferTransferLock.unlock();*/
-
-	//Update constant buffers and draw triangles
-	//for (int i = 0; i < 100; ++i) {
-
-	//D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gRenderTargetsHeap->GetGPUDescriptorHandleForHeapStart();
-
-	// todo only have one copy of the gamestate on the gpu since it isn't used in parallel
 	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource->GetGPUVirtualAddress();
-	//D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource[swapBufferIndex]->GetGPUVirtualAddress();
 
 	for(int i = 0; i < TOTAL_DRAGONS; ++i) {
-	//for (auto &m : p->mGameStateHandler.getReadOnlyStateAtIndex(index)->meshes) {
-		directList->SetGraphicsRootConstantBufferView(0, gpuVir);
-		//directList->SetComputeRootConstantBufferView(0, gpuVir);
+		// Set the per-mesh constant buffer
+		dirList->SetGraphicsRootConstantBufferView(0, gpuVir);
 		gpuVir += sizeof(CONSTANT_BUFFER_DATA);
 
-		/*directList->SetGraphicsRoot32BitConstants(0, 4, &m.translate, 0);
-		directList->SetGraphicsRoot32BitConstants(1, 4, &m.color, 0);*/
-
-		//directList->SetGraphicsRootDescriptorTable(4, gdh);
-		//gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-
-		directList->DrawInstanced(300'000, 1, 0, 0);
+		dirList->DrawInstanced(300'000, 1, 0, 0);
 	}
 
 	// set state to common since this is used in by the compute queue as well
-	SetResourceTransitionBarrier(directList, perFrame->gIntermediateRenderTarget,
+	SetResourceTransitionBarrier(dirList, frame->gIntermediateRenderTarget,
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_COMMON
 	);
@@ -223,20 +179,17 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
 		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
 		// timer end
-		p->gpuTimer[0].stop(directList, arrIndex);
-		p->gpuTimer[0].resolveQueryToCPU(directList, arrIndex);
+		p->gpuTimer[0].stop(dirList, arrIndex);
+		p->gpuTimer[0].resolveQueryToCPU(dirList, arrIndex);
 
 		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][0].Stop);
 	}
 #endif
 
 	//Close the list to prepare it for execution.
-	directList->Close();
-
-	//wait for current frame to finish rendering before pushing the next one to GPU
-	//p->gCommandQueues[QUEUE_TYPE_DIRECT].WaitForGpu();
+	dirList->Close();
 
 	//Execute the command list.
-	ID3D12CommandList* listsToExecute[] = { directList };
-	p->gCommandQueues[QT_DIR].mQueue->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
+	ID3D12CommandList* listsToExecute[] = { dirList };
+	p->gCommandQueues[QT_DIR]->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
 }

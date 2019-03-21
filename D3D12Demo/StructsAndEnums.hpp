@@ -85,173 +85,18 @@ struct alignas(256) CONSTANT_BUFFER_DATA {
 	float4 color;
 };
 
-struct PerFrameResources
-{
-	ID3D12Resource1* gIntermediateRenderTarget = nullptr;
-	ID3D12Resource1* gUAVResource = nullptr;
-
-	ID3D12Fence1*	mIntraFrameFence		= nullptr;
-	HANDLE			mIntraEventHandle		= nullptr;
-	UINT64			mIntraFenceValue		= 0;
-	UINT64			mIntraWaitForValue		= 0;
-
-
-	ID3D12Fence1*	mPerFrameFence			= nullptr;
-	HANDLE			mPerFrameEventHandle	= nullptr;
-	UINT64			mPerFrameFenceValue		= 0;
-	UINT64			mPerFrameWaitForValue	= 0;
-
-
-	void CreateFenceAndEventHandle(D3D12DevPtr dev)
-	{
-		dev->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mIntraFrameFence));
-		mIntraFenceValue = 1;
-		//Create an event handle to use for GPU synchronization.
-		mIntraEventHandle = CreateEvent(0, false, false, 0);
-
-		dev->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mPerFrameFence));
-		mPerFrameFenceValue = 1;
-		//Create an event handle to use for GPU synchronization.
-		mPerFrameEventHandle = CreateEvent(0, false, false, 0);
-	}
-
-	void Release()
-	{
-		SafeRelease(&gIntermediateRenderTarget);
-		SafeRelease(&gUAVResource);
-		//SafeRelease(&gSwapChainRenderTarget);
-
-		CloseHandle(mIntraEventHandle);
-		SafeRelease(&mIntraFrameFence);
-		
-		CloseHandle(mPerFrameEventHandle);
-		SafeRelease(&mPerFrameFence);
-	}
-
-	void SignalIntraFrameFence(ID3D12CommandQueue* queue)
-	{
-		//Signal and increment the fence value.
-		const UINT64 fence = mIntraFenceValue;
-
-		mIntraWaitForValue = fence;
-
-		queue->Signal(mIntraFrameFence, fence);
-
-		InterlockedIncrement(&mIntraFenceValue);
-		//mIntraFenceValue++;
-	}
-
-	void WaitForIntraFrameEventCompletion()
-	{
-		//Wait until command queue is done.
-		if (mIntraFrameFence->GetCompletedValue() < mIntraWaitForValue) {
-			mIntraFrameFence->SetEventOnCompletion(mIntraWaitForValue, mIntraEventHandle);
-			WaitForSingleObject(mIntraEventHandle, INFINITE);
-		}
-		// Only one thread per PerFrameResources instance so shouldn't cause any issues
-		//mIntraWaitForValue++;
-	}
-
-
-
-
-	void SignalEndOfFrame(ID3D12CommandQueue* queue)
-	{
-		//Signal and increment the fence value.
-		const UINT64 fence = mPerFrameFenceValue;
-
-		mPerFrameWaitForValue = fence;
-
-		queue->Signal(mPerFrameFence, fence);
-
-		InterlockedIncrement(&mPerFrameFenceValue);
-	}
-
-	void WaitForEndOfPrevFrameWithThisIndex()
-	{
-		//Wait until command queue is done.
-		if (mPerFrameFence->GetCompletedValue() < mPerFrameWaitForValue) {
-			mPerFrameFence->SetEventOnCompletion(mPerFrameWaitForValue, mPerFrameEventHandle);
-			WaitForSingleObject(mPerFrameEventHandle, INFINITE);
-		}
-		// Only one thread per PerFrameResources instance so shouldn't cause any issues
-		//mPerFrameWaitForValue++;
-	}
-};
-
-//struct PerThreadFenceHandle 
-//{
-//	HANDLE mHandle = CreateEvent(0, false, false, 0);
-//
-//
-//	void WaitForFenceValue(ID3D12Fence1* fence, UINT64 value)
-//	{
-//		if (fence->GetCompletedValue() < value) {
-//			fence->SetEventOnCompletion(value, mHandle);
-//			WaitForSingleObject(mHandle, INFINITE);
-//		}
-//	}
-//};
-
-struct CommandQueueAndFence
-{
-	ID3D12CommandQueue* mQueue = nullptr;
-	ID3D12Fence1*		mFence = nullptr;
-	HANDLE				mEventHandle = nullptr;
-	UINT64				mFenceValue = 0;
-
-	void CreateFenceAndEventHandle(D3D12DevPtr dev)
-	{
-		dev->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mFence));
-		mFenceValue = 1;
-		//Create an event handle to use for GPU synchronization.
-		mEventHandle = CreateEvent(0, false, false, 0);
-	}
-
-	void Release()
-	{
-		CloseHandle(mEventHandle);
-		SafeRelease(&mQueue);
-		SafeRelease(&mFence);
-	}
-
-	void WaitForGpu() {
-		//WAITING FOR EACH FRAME TO COMPLETE BEFORE CONTINUING IS NOT BEST PRACTICE.
-		//This is code implemented as such for simplicity. The cpu could for example be used
-		//for other tasks to prepare the next frame while the current one is being rendered.
-
-		//Signal and increment the fence value.
-		const UINT64 fence = mFenceValue;
-
-		mQueue->Signal(mFence, fence);
-
-		mFenceValue++;
-
-		//Wait until command queue is done.
-		if (mFence->GetCompletedValue() < fence)
-		{
-			mFence->SetEventOnCompletion(fence, mEventHandle);
-			WaitForSingleObject(mEventHandle, INFINITE);
-		}
-	}
-};
 
 struct CommandAllocatorAndList
 {
 	ID3D12CommandAllocator*		mAllocator = nullptr;
 	D3D12GraphicsCommandListPtr mCommandList = nullptr;
 
-	//UINT64 mLastFrameWithThisAllocatorFenceValue = 0;
-	//HANDLE				mEventHandle = nullptr;
-
 	void CreateCommandListAndAllocator(QueueType type, D3D12DevPtr dev)
 	{
 		D3D12_COMMAND_LIST_TYPE listType = D3D12_COMMAND_LIST_TYPE_DIRECT;
 		if (type == QT_COMP) { listType = D3D12_COMMAND_LIST_TYPE_COMPUTE; }
 
-		HRESULT hr = dev->CreateCommandAllocator(
-			listType,
-			IID_PPV_ARGS(&mAllocator));
+		HRESULT hr = dev->CreateCommandAllocator(listType, IID_PPV_ARGS(&mAllocator));
 
 		//Create command list.
 		hr = dev->CreateCommandList(
@@ -261,15 +106,9 @@ struct CommandAllocatorAndList
 			nullptr,
 			IID_PPV_ARGS(&mCommandList));
 
-		if (FAILED(hr)) {
-			int a = 47318;
-		}
-
 		//Command lists are created in the recording state. Since there is nothing to
 		//record right now and the main loop expects it to be closed, we close it.
 		mCommandList->Close();
-
-		//mEventHandle = CreateEvent(0, false, false, 0);
 
 #ifdef _DEBUG
 		//HRESULT hr = S_OK;
@@ -283,9 +122,33 @@ struct CommandAllocatorAndList
 
 	void Release()
 	{
-		//CloseHandle(mEventHandle);
 		SafeRelease(&mAllocator);
 		SafeRelease(&mCommandList);
+	}
+};
+
+
+struct PerFrame
+{
+	CommandAllocatorAndList mAllocatorsAndLists[NUM_STAGES_IN_FRAME];
+	ID3D12Resource1*		gIntermediateRenderTarget = nullptr;
+	ID3D12Resource1*		gUAVResource = nullptr;
+
+
+	void Release()
+	{
+		for (int i = 0; i < NUM_STAGES_IN_FRAME; ++i) {
+			mAllocatorsAndLists[i].Release();
+		}
+		gIntermediateRenderTarget->Release();
+		gUAVResource->Release();
+	}
+
+	void CreateCommandListsAndAllocators(D3D12DevPtr dev)
+	{
+		mAllocatorsAndLists[GEOMETRY_STAGE].CreateCommandListAndAllocator(QT_DIR, dev);
+		mAllocatorsAndLists[FXAA_STAGE].CreateCommandListAndAllocator(QT_COMP, dev);
+		mAllocatorsAndLists[PRESENT_STAGE].CreateCommandListAndAllocator(QT_DIR, dev);
 	}
 };
 #pragma endregion
