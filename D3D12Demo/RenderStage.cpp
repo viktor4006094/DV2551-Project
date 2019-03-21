@@ -130,10 +130,13 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 	directList->Reset(directAllocator, mPipelineState);
 
 #ifdef RECORD_TIME
-	QueryPerformanceCounter(&p->mCPUTimeStamps[frameIndex][0].Start);
+	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
+		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
+		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][0].Start);
 
-	// timer start
-	p->gpuTimer[0].start(directList, frameIndex);
+		// timer start
+		p->gpuTimer[0].start(directList, arrIndex);
+	}
 #endif
 
 	//Set root signature
@@ -217,11 +220,14 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 
 
 #ifdef RECORD_TIME
-	// timer end
-	p->gpuTimer[0].stop(directList, frameIndex);
-	p->gpuTimer[0].resolveQueryToCPU(directList, frameIndex);
+	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
+		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
+		// timer end
+		p->gpuTimer[0].stop(directList, arrIndex);
+		p->gpuTimer[0].resolveQueryToCPU(directList, arrIndex);
 
-	QueryPerformanceCounter(&p->mCPUTimeStamps[frameIndex][0].Stop);
+		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][0].Stop);
+	}
 #endif
 
 	//Close the list to prepare it for execution.

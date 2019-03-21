@@ -94,10 +94,13 @@ void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, 
 	computeList->Reset(computeAllocator, mPipelineState);
 
 #ifdef RECORD_TIME
-	QueryPerformanceCounter(&p->mCPUTimeStamps[frameIndex][1].Start);
+	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
+		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
+		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][1].Start);
 
-	// timer start
-	p->gpuTimer[1].start(computeList, frameIndex);
+		// timer start
+		p->gpuTimer[1].start(computeList, arrIndex);
+	}
 #endif
 	//Set root signature
 	computeList->SetComputeRootSignature(p->gRootSignature);
@@ -150,11 +153,14 @@ void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, 
 
 
 #ifdef RECORD_TIME
-	// timer end
-	p->gpuTimer[1].stop(computeList, frameIndex);
-	p->gpuTimer[1].resolveQueryToCPU(computeList, frameIndex);
+	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
+		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
+		// timer end
+		p->gpuTimer[1].stop(computeList, arrIndex);
+		p->gpuTimer[1].resolveQueryToCPU(computeList, arrIndex);
 
-	QueryPerformanceCounter(&p->mCPUTimeStamps[frameIndex][1].Stop);
+		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][1].Stop);
+	}
 #endif
 
 	//Close the list to prepare it for execution.

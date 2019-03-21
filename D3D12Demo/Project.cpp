@@ -6,7 +6,7 @@
 #include <ctime>
 #include <string>
 
-#include <iostream>
+#include <sstream>
 
 #include <functional>
 
@@ -856,10 +856,13 @@ void Project::CopyComputeOutputToBackBuffer(UINT64 frameIndex, int swapBufferInd
 	directAllocator->Reset();
 	directList->Reset(directAllocator, nullptr);
 #ifdef RECORD_TIME
-	QueryPerformanceCounter(&mCPUTimeStamps[frameIndex][2].Start);
+	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
+		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
+		QueryPerformanceCounter(&mCPUTimeStamps[arrIndex][2].Start);
 
-	// gpu timer start
-	gpuTimer[2].start(directList, frameIndex);
+		// gpu timer start
+		gpuTimer[2].start(directList, arrIndex);
+	}
 #endif
 
 	SetResourceTransitionBarrier(directList, perFrame->gUAVResource,
@@ -883,11 +886,14 @@ void Project::CopyComputeOutputToBackBuffer(UINT64 frameIndex, int swapBufferInd
 	);
 
 #ifdef RECORD_TIME
-	gpuTimer[2].stop(directList, frameIndex);
-	gpuTimer[2].resolveQueryToCPU(directList, frameIndex);
-	//Close the list to prepare it for execution.
+	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
+		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
+		gpuTimer[2].stop(directList, arrIndex);
+		gpuTimer[2].resolveQueryToCPU(directList, arrIndex);
+		//Close the list to prepare it for execution.
 
-	QueryPerformanceCounter(&mCPUTimeStamps[frameIndex][2].Stop);
+		QueryPerformanceCounter(&mCPUTimeStamps[arrIndex][2].Stop);
+	}
 #endif
 	//Close the list to prepare it for execution.
 	directList->Close();
@@ -937,68 +943,65 @@ void Project::Render(int id)
 
 	gThreadIDIndexLock.unlock();
 
-#ifdef RECORD_TIME
-	if (frameIndex < NUM_TIMESTAMP_PAIRS) {
-#endif
-		if (isRunning) {
 
-			// Update the index used by the CPU update loop
-			mLatestBackBufferIndex = 0;// swapBufferIndex;
+	if (isRunning) {
+		// Update the index used by the CPU update loop
+		mLatestBackBufferIndex = 0;// swapBufferIndex;
 
-			PerFrameResources* perFrame = &gPerFrameResources[swapBufferIndex];
-			PerThreadFenceHandle* perThread = &gPerThreadFenceHandles[threadIndex];
+		PerFrameResources* perFrame = &gPerFrameResources[swapBufferIndex];
+		PerThreadFenceHandle* perThread = &gPerThreadFenceHandles[threadIndex];
 
 
-			////////// Render geometry section //////////
+		////////// Render geometry section //////////
 
-			// Render the geometry
-			GPUStages[0]->Run(frameIndex, swapBufferIndex, threadIndex, this);
+		// Render the geometry
+		GPUStages[0]->Run(frameIndex, swapBufferIndex, threadIndex, this);
 
-			// Signal that the geometry stage is finished
-			UINT64 threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
-			gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
+		// Signal that the geometry stage is finished
+		UINT64 threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
+		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
 
-			// Begin the rendering of the next frame once the first part of this frame is done.
-			gThreadPool->push([this](int id) {Render(id); });
+		// Begin the rendering of the next frame once the first part of this frame is done.
+		gThreadPool->push([this](int id) {Render(id); });
 
 
 
-			////////// FXAA section //////////
+		////////// FXAA section //////////
 
-			// Apply FXAA to the rendered image with a compute shader
-			GPUStages[1]->Run(frameIndex, swapBufferIndex, threadIndex, this);
+		// Apply FXAA to the rendered image with a compute shader
+		GPUStages[1]->Run(frameIndex, swapBufferIndex, threadIndex, this);
 
-			// Signal that the FXAA stage is finished
-			threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
-			gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
+		// Signal that the FXAA stage is finished
+		threadFenceValue = InterlockedIncrement(&gThreadFenceValues[threadIndex]);
+		gCommandQueues[QUEUE_TYPE_COMPUTE].mQueue->Signal(gThreadFences[threadIndex], threadFenceValue);
 
 
-			////////// Present section //////////
+		////////// Present section //////////
 
-			// Wait for the previous frame to have been presented
-			if (gBackBufferFence->GetCompletedValue() < frameIndex) {
-				gBackBufferFence->SetEventOnCompletion(frameIndex, gBackBufferFenceEvent[swapBufferIndex]);
-				WaitForSingleObject(gBackBufferFenceEvent[swapBufferIndex], INFINITE);
-			}
-
-			// Lock this section since if Present is called in another thread whilst in this section the backbufferIndex 
-			// used in CopyComputeOutputToBackBuffer() becomes invalid and the application crashes
-			gPresentLock.lock();
-
-			// Copy the result of the FXAA compute shader to the back buffer
-			CopyComputeOutputToBackBuffer(frameIndex, swapBufferIndex, threadIndex);
-
-			// Signal that the frame with frameIndex+1 can enter the present section after this one is done
-			gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gBackBufferFence, frameIndex + 1);
-
-			// Present the frame.
-			DXGI_PRESENT_PARAMETERS pp = {};
-			gSwapChain4->Present1(0, DXGI_PRESENT_ALLOW_TEARING, &pp);
-
-			gPresentLock.unlock();
+		// Wait for the previous frame to have been presented
+		if (gBackBufferFence->GetCompletedValue() < frameIndex) {
+			gBackBufferFence->SetEventOnCompletion(frameIndex, gBackBufferFenceEvent[swapBufferIndex]);
+			WaitForSingleObject(gBackBufferFenceEvent[swapBufferIndex], INFINITE);
 		}
+
+		// Lock this section since if Present is called in another thread whilst in this section the backbufferIndex 
+		// used in CopyComputeOutputToBackBuffer() becomes invalid and the application crashes
+		gPresentLock.lock();
+
+		// Copy the result of the FXAA compute shader to the back buffer
+		CopyComputeOutputToBackBuffer(frameIndex, swapBufferIndex, threadIndex);
+
+		// Signal that the frame with frameIndex+1 can enter the present section after this one is done
+		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->Signal(gBackBufferFence, frameIndex + 1);
+
+		// Present the frame.
+		DXGI_PRESENT_PARAMETERS pp = {};
+		gSwapChain4->Present1(0, DXGI_PRESENT_ALLOW_TEARING, &pp);
+
+		gPresentLock.unlock();
+	}
 #ifdef RECORD_TIME
-	} else {
+	if (frameIndex == FIRST_TIMESTAMPED_FRAME + NUM_TIMESTAMP_PAIRS - 1) {
 		UINT64 gpuEpoch = mClockCalibration.gpuTimeStamp;
 		UINT64 gpuFreq;
 		gCommandQueues[QUEUE_TYPE_DIRECT].mQueue->GetTimestampFrequency(&gpuFreq);
@@ -1010,45 +1013,58 @@ void Project::Render(int id)
 		UINT64 cpuFreq = cpuLIFreq.QuadPart;
 		double cpuTimestampToMs = (1.0 / cpuFreq) * 1'000.0;
 
+		FILE *f;
+
+		std::stringstream ss;
+		ss << "data" << MAX_FRAME_LATENCY << ".tex";
+		
+
+		if (fopen_s(&f, ss.str().c_str(), "w") != 0) {
+			OutputDebugStringA("Error: could not open file to write data to.\n");
+			return;
+		}
+
+		char buffer[1000];
+		sprintf_s(buffer, "%% Timestamps with max frame latency: %d\n\n\n", MAX_FRAME_LATENCY);
+		fprintf(f, "%s", buffer);
+
 		// save timestamps to file
 		for (int i = 0; i < NUM_TIMESTAMP_PAIRS; ++i) {
 			CPUTimeStampPair cpuTimePair = mCPUTimeStamps[i][0];
-
-			char buffer[1000];
+			int frame = i + FIRST_TIMESTAMPED_FRAME;
 
 			double cpuTimes[3][2];
 			double gpuTimes[3][2];
-			
+
 			for (int part = 0; part < 3; part++) {
 				cpuTimes[part][0] = (mCPUTimeStamps[i][part].Start.QuadPart - cpuEpoch) * cpuTimestampToMs;
-				cpuTimes[part][1] = (mCPUTimeStamps[i][part].Stop.QuadPart  - cpuEpoch) * cpuTimestampToMs;
-			
+				cpuTimes[part][1] = (mCPUTimeStamps[i][part].Stop.QuadPart - cpuEpoch) * cpuTimestampToMs;
+
 				D3D12::GPUTimestampPair gpuTSP = gpuTimer[part].getTimestampPair(i);
 				gpuTimes[part][0] = ((gpuTSP.Start - gpuEpoch) * gpuTimestampToMs);
-				gpuTimes[part][1] = ((gpuTSP.Stop  - gpuEpoch) * gpuTimestampToMs);
+				gpuTimes[part][1] = ((gpuTSP.Stop - gpuEpoch) * gpuTimestampToMs);
 			}
 
 
-
-			sprintf_s(buffer, "%% CPU frame: %d\n", i);
-			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "%% CPU frame: %d\n", frame);
+			fprintf(f, "%s", buffer);
 			sprintf_s(buffer, "\\addplot[geomStyle%d] coordinates{ (%.6f,%.1f) (%.6f,%.1f) }; \n", (i % 3), cpuTimes[0][0], (0.9 + (i % 3) / 10.0), cpuTimes[0][1], (0.9 + (i % 3) / 10.0));
-			OutputDebugStringA(buffer);
+			fprintf(f, "%s", buffer);
 			sprintf_s(buffer, "\\addplot[fxaaStyle%d] coordinates{ (%.6f,%.1f) (%.6f,%.1f) }; \n", (i % 3), cpuTimes[1][0], (0.9 + (i % 3) / 10.0), cpuTimes[1][1], (0.9 + (i % 3) / 10.0));
-			OutputDebugStringA(buffer);
+			fprintf(f, "%s", buffer);
 			sprintf_s(buffer, "\\addplot[presStyle%d] coordinates{ (%.6f,%.1f) (%.6f,%.1f) }; \n", (i % 3), cpuTimes[2][0], (0.9 + (i % 3) / 10.0), cpuTimes[2][1], (0.9 + (i % 3) / 10.0));
-			OutputDebugStringA(buffer);
+			fprintf(f, "%s", buffer);
 
-			sprintf_s(buffer, "%% GPU frame: %d\n", i);
-			OutputDebugStringA(buffer);
+			sprintf_s(buffer, "%% GPU frame: %d\n", frame);
+			fprintf(f, "%s", buffer);
 			sprintf_s(buffer, "\\addplot[geomStyle%d] coordinates{ (%.6f,1.75) (%.6f,1.75) }; \n", (i % 3), gpuTimes[0][0], gpuTimes[0][1]);
-			OutputDebugStringA(buffer);
+			fprintf(f, "%s", buffer);
 			sprintf_s(buffer, "\\addplot[fxaaStyle%d] coordinates{ (%.6f,2) (%.6f,2) }; \n", (i % 3), gpuTimes[1][0], gpuTimes[1][1]);
-			OutputDebugStringA(buffer);
+			fprintf(f, "%s", buffer);
 			sprintf_s(buffer, "\\addplot[presStyle%d] coordinates{ (%.6f,1.75) (%.6f,1.75) }; \n\n", (i % 3), gpuTimes[2][0], gpuTimes[2][1]);
-			OutputDebugStringA(buffer);
+			fprintf(f, "%s", buffer);
 		}
-
+		fclose(f);
 	}
 #endif
 }
