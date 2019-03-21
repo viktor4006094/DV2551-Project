@@ -49,7 +49,7 @@ void GameStateHandler::ShutDown()
 }
 
 // todo remove currentFrameIndex, use only one constantbuffer on the gpu
-void GameStateHandler::Update(int id, UINT* currentFrameIndex)
+void GameStateHandler::Update(int id)
 {
 	static auto startTime = std::chrono::high_resolution_clock::now();
 	static double tickRate = 512.0;
@@ -82,7 +82,7 @@ void GameStateHandler::Update(int id, UINT* currentFrameIndex)
 			//gBufferTransferLock.lock();
 
 			//todo? copy it to the next frames buffer, 
-			memcpy((void*)pMappedCB[*currentFrameIndex], cbData, sizeof(cbData));
+			memcpy((void*)pMappedCB, cbData, sizeof(cbData));
 
 			//bufferState = writeState;
 			//gBufferTransferLock.unlock();

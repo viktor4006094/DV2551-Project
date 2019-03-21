@@ -12,10 +12,10 @@ public:
 
 	void CreatePerMeshData();
 	void ShutDown();
-	void Update(int id, UINT* currentFrameIndex);
+	void Update(int id);
 
 	CONSTANT_BUFFER_DATA cbData[TOTAL_DRAGONS];
-	CONSTANT_BUFFER_DATA *pMappedCB[NUM_SWAP_BUFFERS];
+	CONSTANT_BUFFER_DATA *pMappedCB;
 private:
 	// 4/3
 	DirectX::XMMATRIX projMat = DirectX::XMMatrixOrthographicLH((48.0f*SCREEN_WIDTH)/SCREEN_HEIGHT, 48.0f, 0.1f, 100.0f);

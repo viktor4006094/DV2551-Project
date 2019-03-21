@@ -82,8 +82,8 @@ void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, 
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
 
-	ID3D12CommandAllocator* computeAllocator = p->gAllocatorsAndLists[threadIndex][QT_COMP].mAllocator;
-	D3D12GraphicsCommandListPtr computeList  = p->gAllocatorsAndLists[threadIndex][QT_COMP].mCommandList;
+	ID3D12CommandAllocator* computeAllocator = p->gAllocatorsAndLists[swapBufferIndex][FXAA_STAGE].mAllocator;
+	D3D12GraphicsCommandListPtr computeList  = p->gAllocatorsAndLists[swapBufferIndex][FXAA_STAGE].mCommandList;
 
 
 	//// Compute shader part ////
@@ -92,7 +92,7 @@ void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, 
 
 	computeAllocator->Reset();
 	computeList->Reset(computeAllocator, mPipelineState);
-
+	
 #ifdef RECORD_TIME
 	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
 		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
@@ -167,13 +167,8 @@ void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, 
 	computeList->Close();
 
 
-
 	// Wait for the geometry stage to be finished
-	if (p->gThreadFences[threadIndex]->GetCompletedValue() < p->gThreadFenceValues[threadIndex]) {
-		p->gThreadFences[threadIndex]->SetEventOnCompletion(p->gThreadFenceValues[threadIndex], p->gThreadFenceEvents[threadIndex]);
-		WaitForSingleObject(p->gThreadFenceEvents[threadIndex], INFINITE);
-	}
-
+	p->gCommandQueues[QT_COMP].mQueue->Wait(p->gThreadFences[threadIndex], p->gThreadFenceValues[threadIndex]);
 
 	//Execute the command list.
 	ID3D12CommandList* listsToExecute2[] = { computeList };

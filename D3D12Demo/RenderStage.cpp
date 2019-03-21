@@ -111,11 +111,11 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 
 	//Command list allocators can only be reset when the associated command lists have
 	//finished execution on the GPU; fences are used to ensure this (See WaitForGpu method)
-	ID3D12CommandAllocator* directAllocator = p->gAllocatorsAndLists[threadIndex][QT_DIR].mAllocator;
-	D3D12GraphicsCommandListPtr	directList = p->gAllocatorsAndLists[threadIndex][QT_DIR].mCommandList;
+	ID3D12CommandAllocator* directAllocator = p->gAllocatorsAndLists[swapBufferIndex][GEOMETRY_STAGE].mAllocator;
+	D3D12GraphicsCommandListPtr	directList = p->gAllocatorsAndLists[swapBufferIndex][GEOMETRY_STAGE].mCommandList;
 
 	ID3D12Fence1* fence = p->gCommandQueues[QT_DIR].mFence;
-	HANDLE eventHandle = p->gAllocatorsAndLists[threadIndex][QT_DIR].mEventHandle;
+	//x HANDLE eventHandle = p->gAllocatorsAndLists[threadIndex][QT_DIR].mEventHandle;
 
 	////! since WaitForGPU is called just before the commandlist is executed in the previous frame this does 
 	////! not need to be done here since the command allocator is already guaranteed to have finished executing
@@ -194,7 +194,7 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 	//D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gRenderTargetsHeap->GetGPUDescriptorHandleForHeapStart();
 
 	// todo only have one copy of the gamestate on the gpu since it isn't used in parallel
-	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource[0]->GetGPUVirtualAddress();
+	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource->GetGPUVirtualAddress();
 	//D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource[swapBufferIndex]->GetGPUVirtualAddress();
 
 	for(int i = 0; i < TOTAL_DRAGONS; ++i) {
