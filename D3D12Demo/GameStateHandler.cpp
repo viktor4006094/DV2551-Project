@@ -52,7 +52,7 @@ void GameStateHandler::CreateMeshes()
 		DirectX::XMStoreFloat4x4(
 			&cbData[i].world,
 			DirectX::XMMatrixTranspose(
-				DirectX::XMMatrixScaling(0.1f, 0.1f, 0.1f)* DirectX::XMMatrixTranslation((j / 20) * 3.0f - 28.0f, (j % 20) * 2.4f - 13.0f, 20.0f)
+				DirectX::XMMatrixScaling(0.2f, 0.2f, 0.2f)* DirectX::XMMatrixTranslation((j / 10) * 6.0f - 28.0f, (j %10) * 4.8f - 13.0f, 20.0f)
 			)
 		);
 	}
@@ -87,7 +87,7 @@ void GameStateHandler::Update(int id, UINT* currentFrameIndex)
 
 				}
 				else {
-					int colInd = (m - 4) / 20;
+					int colInd = (m - 4) / 10;
 					int dir=1;
 					if (colInd % 3 < 1) {
 						dir = -1;
