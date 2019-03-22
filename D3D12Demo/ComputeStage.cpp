@@ -25,12 +25,6 @@ void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 		NULL, NULL
 	};
 
-	/*D3D_SHADER_MACRO computeDefines[] =
-	{
-		"TEXTURE_WIDTH", "640",
-		"TEXTURE_HEIGHT", "480",
-		NULL, NULL
-	};*/
 
 	////// Shader Compiles //////
 	ID3DBlob* computeBlob;
@@ -95,13 +89,6 @@ void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, 
 	//Set root signature
 	compList->SetComputeRootSignature(p->gRootSignature);
 
-	// Set the correct state for the input, will be set to common between queue types
-	SetResourceTransitionBarrier(compList, frame->gIntermediateRenderTarget,
-		D3D12_RESOURCE_STATE_COMMON,
-		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
-	);
-
-
 	ID3D12DescriptorHeap* dheap1[] = { p->gComputeDescriptorHeap };
 	compList->SetDescriptorHeaps(_countof(dheap1), dheap1);
 
@@ -114,29 +101,10 @@ void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, 
 	compList->SetComputeRootDescriptorTable(1, gdh);
 
 
-	SetResourceTransitionBarrier(compList, frame->gUAVResource,
-		D3D12_RESOURCE_STATE_COPY_SOURCE,
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS
-	);
-
-
 	static const UINT squaresWide = SCREEN_WIDTH / 32U + 1;
 	static const UINT squaresHigh = SCREEN_HEIGHT / 32U + 1;
 
 	compList->Dispatch(squaresWide, squaresHigh, 1);
-
-	SetResourceTransitionBarrier(compList, frame->gUAVResource,
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-		D3D12_RESOURCE_STATE_COMMON
-	);
-
-
-	// set state to common since this is used in by the direct queue as well
-	SetResourceTransitionBarrier(compList, frame->gIntermediateRenderTarget,
-		D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
-		D3D12_RESOURCE_STATE_COMMON
-	);
-
 
 #ifdef RECORD_TIME
 	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {

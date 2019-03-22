@@ -131,7 +131,6 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 		D3D12_RESOURCE_STATE_RENDER_TARGET
 	);
 
-
 	//Record commands.
 	//Get the handle for the current render target in the intermediate output buffer.
 	D3D12_CPU_DESCRIPTOR_HANDLE cdh = p->gIntermediateRenderTargetsDescHeap->GetCPUDescriptorHandleForHeapStart();
@@ -144,10 +143,6 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 	// set and clear render targets and depth stencil
 	dirList->OMSetRenderTargets(1, &cdh, false, &dsvh);
 	dirList->ClearRenderTargetView(cdh, gClearColor, 0, nullptr);
-
-
-	//Set root signature
-	dirList->SetGraphicsRootSignature(p->gRootSignature);
 
 	//Set necessary states.
 	dirList->RSSetViewports(1, &p->gViewport);
@@ -163,17 +158,16 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 	for(int i = 0; i < TOTAL_DRAGONS; ++i) {
 		// Set the per-mesh constant buffer
 		dirList->SetGraphicsRootConstantBufferView(0, gpuVir);
-		gpuVir += sizeof(CONSTANT_BUFFER_DATA);
+		gpuVir += sizeof(CONSTANT_BUFFER_DATA); // todo make constant somewhere
 
 		dirList->DrawInstanced(300'000, 1, 0, 0);
 	}
 
-	// set state to common since this is used in by the compute queue as well
+	// Transition the intermediate rendertarget to common so that 
 	SetResourceTransitionBarrier(dirList, frame->gIntermediateRenderTarget,
 		D3D12_RESOURCE_STATE_RENDER_TARGET,
 		D3D12_RESOURCE_STATE_COMMON
 	);
-
 
 #ifdef RECORD_TIME
 	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {

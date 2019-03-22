@@ -482,6 +482,7 @@ void Project::UploadMeshData()
 	dirList->CopyBufferRegion(gVertexBufferResource, 0, gVertexStagingBufferResource, 0, sizeof(triangleVertices));
 	dirList->CopyBufferRegion(gVertexBufferNormalResource, 0, gNormalStagingBufferResource, 0, sizeof(triangleVertices));
 
+	//  todo change to transition helper function
 	D3D12_RESOURCE_BARRIER barrierDesc{};
 	barrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrierDesc.Transition.pResource = gVertexBufferResource;
@@ -645,6 +646,7 @@ void Project::CreateComputeShaderResources()
 	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
 		HRESULT hr = gDevice5->CreateCommittedResource(
 			&intRThp, D3D12_HEAP_FLAG_NONE, &intRTresDesc,
+			//D3D12_RESOURCE_STATE_NON_PIXEL_SHADER,
 			D3D12_RESOURCE_STATE_COMMON,
 			&clv, IID_PPV_ARGS(&gPerFrameAllocatorsListsAndResources[i].gIntermediateRenderTarget));
 	}
@@ -797,11 +799,6 @@ void Project::CopyComputeOutputToBackBuffer(UINT64 frameIndex, int swapBufferInd
 		gpuTimer[2].start(dirList, arrIndex);
 	}
 #endif
-
-	SetResourceTransitionBarrier(dirList, frame->gUAVResource,
-		D3D12_RESOURCE_STATE_COMMON,
-		D3D12_RESOURCE_STATE_COPY_SOURCE
-	);
 
 	//Indicate that the back buffer will be used as render target.
 	SetResourceTransitionBarrier(dirList, gSwapChainRenderTargets[backBufferIndex],
