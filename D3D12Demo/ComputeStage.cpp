@@ -13,6 +13,8 @@ ComputeStage::~ComputeStage()
 
 void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 {
+	mDescriptorHandleSize = dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
 	std::string widthString = std::to_string(SCREEN_WIDTH);
 	LPCSTR widthLPCSTR = widthString.c_str();
 	std::string heightString = std::to_string(SCREEN_HEIGHT);
@@ -69,8 +71,8 @@ void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, Project* p)
 {
 	PerFrame* frame = &p->gPerFrameAllocatorsListsAndResources[swapBufferIndex];
-	ID3D12CommandAllocator*     compAllo = frame->mAllocatorsAndLists[FXAA_STAGE].mAllocator;
-	D3D12GraphicsCommandListPtr compList = frame->mAllocatorsAndLists[FXAA_STAGE].mCommandList;
+	ID3D12CommandAllocator*     compAllo = frame->mAllocatorsAndLists[FXAA_STAGE].mAllocators[0];
+	D3D12GraphicsCommandListPtr compList = frame->mAllocatorsAndLists[FXAA_STAGE].mCommandLists[0];
 
 	//// Compute shader part ////
 
@@ -93,11 +95,10 @@ void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, 
 	compList->SetDescriptorHeaps(_countof(dheap1), dheap1);
 
 	D3D12_GPU_DESCRIPTOR_HANDLE gdh = p->gComputeDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-	// todo save increment size
-	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*swapBufferIndex;
+	gdh.ptr += mDescriptorHandleSize * swapBufferIndex;
 	compList->SetComputeRootDescriptorTable(2, gdh);
-	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*(NUM_SWAP_BUFFERS - swapBufferIndex);
-	gdh.ptr += p->gDevice5->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)*swapBufferIndex;
+	
+	gdh.ptr += mDescriptorHandleSize * NUM_SWAP_BUFFERS;
 	compList->SetComputeRootDescriptorTable(1, gdh);
 
 

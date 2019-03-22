@@ -101,21 +101,139 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 
 void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, Project* p)
 {
-	static size_t lastRenderIterationIndex = 0;
-
 	PerFrame* frame = &p->gPerFrameAllocatorsListsAndResources[swapBufferIndex];
-	ID3D12CommandAllocator*     dirAllo = frame->mAllocatorsAndLists[GEOMETRY_STAGE].mAllocator;
-	D3D12GraphicsCommandListPtr dirList = frame->mAllocatorsAndLists[GEOMETRY_STAGE].mCommandList;
-	
+
+	ID3D12CommandList* listsToExecute[LISTS_PER_FRAME];
+	std::future<void> workers[LISTS_PER_FRAME];
+	bool recordTime = false;
+
+#ifdef RECORD_TIME
+	int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
+	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
+		recordTime = true;
+		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
+		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][0].Start);
+	}
+#endif
+
+	// Start recording command lists
+	for (int i = 0; i < LISTS_PER_FRAME; ++i) {
+		workers[i] = p->gThreadPool->push([=](int id) {this->RenderMeshes(id, frameIndex, swapBufferIndex, threadIndex, p, i, recordTime); });
+	}
+
+	// Wait for command lists to finish recording
+	for (int i = 0; i < LISTS_PER_FRAME; ++i) {
+		workers[i].wait();
+		listsToExecute[i] = frame->mAllocatorsAndLists[GEOMETRY_STAGE].mCommandLists[i];
+	}
+
+#ifdef RECORD_TIME
+	if (recordTime) {
+		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][0].Stop);
+	}
+#endif
+
+	//Execute the command lists.
+	p->gCommandQueues[QT_DIR]->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
+
+
+
+
+
+//
+//	dirList->Reset(dirAllo, mPipelineState);
+//
+//#ifdef RECORD_TIME
+//	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
+//		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
+//		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][0].Start);
+//
+//		// timer start
+//		p->gpuTimer[0].start(dirList, arrIndex);
+//	}
+//#endif
+//
+//	//Set root signature
+//	dirList->SetGraphicsRootSignature(p->gRootSignature);
+//
+//
+//	// Indicate that the intermediate buffer will be used as a render target
+//	SetResourceTransitionBarrier(dirList, frame->gIntermediateRenderTarget,
+//		D3D12_RESOURCE_STATE_COMMON,
+//		D3D12_RESOURCE_STATE_RENDER_TARGET
+//	);
+//
+//	//Record commands.
+//	//Get the handle for the current render target in the intermediate output buffer.
+//	D3D12_CPU_DESCRIPTOR_HANDLE cdh = p->gIntermediateRenderTargetsDescHeap->GetCPUDescriptorHandleForHeapStart();
+//	cdh.ptr += p->gRenderTargetDescriptorSize * swapBufferIndex;
+//
+//	// get a handle to the depth/stencil buffer
+//	D3D12_CPU_DESCRIPTOR_HANDLE dsvh = p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+//	dirList->ClearDepthStencilView(p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+//
+//	// set and clear render targets and depth stencil
+//	dirList->OMSetRenderTargets(1, &cdh, false, &dsvh);
+//	dirList->ClearRenderTargetView(cdh, gClearColor, 0, nullptr);
+//
+//	//Set necessary states.
+//	dirList->RSSetViewports(1, &p->gViewport);
+//	dirList->RSSetScissorRects(1, &p->gScissorRect);
+//
+//	// Set the vertex buffers (positions and normals)
+//	dirList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+//	dirList->IASetVertexBuffers(0, 2, p->gVertexBufferViews);
+//
+//
+//	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource->GetGPUVirtualAddress();
+//
+//	for(int i = 0; i < TOTAL_DRAGONS; ++i) {
+//		// Set the per-mesh constant buffer
+//		dirList->SetGraphicsRootConstantBufferView(0, gpuVir);
+//		gpuVir += sizeof(CONSTANT_BUFFER_DATA); // todo make constant somewhere
+//
+//		dirList->DrawInstanced(300'000, 1, 0, 0);
+//	}
+//
+//	// Transition the intermediate rendertarget to common so that 
+//	SetResourceTransitionBarrier(dirList, frame->gIntermediateRenderTarget,
+//		D3D12_RESOURCE_STATE_RENDER_TARGET,
+//		D3D12_RESOURCE_STATE_COMMON
+//	);
+//
+//#ifdef RECORD_TIME
+//	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
+//		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
+//		// timer end
+//		p->gpuTimer[0].stop(dirList, arrIndex);
+//		p->gpuTimer[0].resolveQueryToCPU(dirList, arrIndex);
+//
+//		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][0].Stop);
+//	}
+//#endif
+//
+//	//Close the list to prepare it for execution.
+//	dirList->Close();
+//
+//	//Execute the command list.
+//	ID3D12CommandList* listsToExecute[] = { dirList };
+//	p->gCommandQueues[QT_DIR]->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
+}
+
+
+void RenderStage::RenderMeshes(int id, const UINT64 frameIndex, const int swapBufferIndex, const int threadIndex, Project* p, const int section, const bool recordTime)
+{
+	PerFrame* frame = &p->gPerFrameAllocatorsListsAndResources[swapBufferIndex];
+	ID3D12CommandAllocator*     dirAllo = frame->mAllocatorsAndLists[GEOMETRY_STAGE].mAllocators[section];
+	D3D12GraphicsCommandListPtr dirList = frame->mAllocatorsAndLists[GEOMETRY_STAGE].mCommandLists[section];
 
 	dirAllo->Reset();
 	dirList->Reset(dirAllo, mPipelineState);
 
 #ifdef RECORD_TIME
-	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
-		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
-		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][0].Start);
-
+	// start recording GPU time
+	int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
+	if (section == 0 && recordTime) {
 		// timer start
 		p->gpuTimer[0].start(dirList, arrIndex);
 	}
@@ -125,11 +243,13 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 	dirList->SetGraphicsRootSignature(p->gRootSignature);
 
 
-	// Indicate that the intermediate buffer will be used as a render target
-	SetResourceTransitionBarrier(dirList, frame->gIntermediateRenderTarget,
-		D3D12_RESOURCE_STATE_COMMON,
-		D3D12_RESOURCE_STATE_RENDER_TARGET
-	);
+	if (section == 0) {
+		// Indicate that the intermediate buffer will be used as a render target
+		SetResourceTransitionBarrier(dirList, frame->gIntermediateRenderTarget,
+			D3D12_RESOURCE_STATE_COMMON,
+			D3D12_RESOURCE_STATE_RENDER_TARGET
+		);
+	}
 
 	//Record commands.
 	//Get the handle for the current render target in the intermediate output buffer.
@@ -138,11 +258,15 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 
 	// get a handle to the depth/stencil buffer
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvh = p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	dirList->ClearDepthStencilView(p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-
+	
+	if (section == 0) {
+		dirList->ClearDepthStencilView(p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
+	}
 	// set and clear render targets and depth stencil
 	dirList->OMSetRenderTargets(1, &cdh, false, &dsvh);
-	dirList->ClearRenderTargetView(cdh, gClearColor, 0, nullptr);
+	if (section == 0) {
+		dirList->ClearRenderTargetView(cdh, gClearColor, 0, nullptr);
+	}
 
 	//Set necessary states.
 	dirList->RSSetViewports(1, &p->gViewport);
@@ -155,35 +279,35 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 
 	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource->GetGPUVirtualAddress();
 
-	for(int i = 0; i < TOTAL_DRAGONS; ++i) {
+	int startDragon = DRAGONS_PER_LIST * section;
+	int endDragon = ((startDragon + 2*DRAGONS_PER_LIST) < TOTAL_DRAGONS) ? startDragon + DRAGONS_PER_LIST : TOTAL_DRAGONS;
+
+	gpuVir += (startDragon * gConstBufferStructSize);
+
+	for (int i = startDragon; i < endDragon; ++i) {
 		// Set the per-mesh constant buffer
 		dirList->SetGraphicsRootConstantBufferView(0, gpuVir);
-		gpuVir += sizeof(CONSTANT_BUFFER_DATA); // todo make constant somewhere
+		gpuVir += gConstBufferStructSize;
 
 		dirList->DrawInstanced(300'000, 1, 0, 0);
 	}
 
-	// Transition the intermediate rendertarget to common so that 
-	SetResourceTransitionBarrier(dirList, frame->gIntermediateRenderTarget,
-		D3D12_RESOURCE_STATE_RENDER_TARGET,
-		D3D12_RESOURCE_STATE_COMMON
-	);
+	if (section == LISTS_PER_FRAME - 1) {
+		// Transition the intermediate rendertarget to common so that 
+		SetResourceTransitionBarrier(dirList, frame->gIntermediateRenderTarget,
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_STATE_COMMON
+		);
+	}
 
 #ifdef RECORD_TIME
-	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
-		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
+	if (section == LISTS_PER_FRAME - 1 && recordTime) {
 		// timer end
 		p->gpuTimer[0].stop(dirList, arrIndex);
 		p->gpuTimer[0].resolveQueryToCPU(dirList, arrIndex);
-
-		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][0].Stop);
 	}
 #endif
 
 	//Close the list to prepare it for execution.
 	dirList->Close();
-
-	//Execute the command list.
-	ID3D12CommandList* listsToExecute[] = { dirList };
-	p->gCommandQueues[QT_DIR]->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
 }

@@ -85,45 +85,85 @@ struct alignas(256) CONSTANT_BUFFER_DATA {
 	float4 color;
 };
 
+const unsigned long long gConstBufferStructSize = sizeof(CONSTANT_BUFFER_DATA);
 
 struct CommandAllocatorAndList
 {
-	ID3D12CommandAllocator*		mAllocator = nullptr;
-	D3D12GraphicsCommandListPtr mCommandList = nullptr;
+	//ID3D12CommandAllocator*		mAllocator = nullptr;
+	//D3D12GraphicsCommandListPtr mCommandList = nullptr;
+	/*D3D12GraphicsCommandListPtr mListArray[LISTS_PER_FRAME] = { nullptr };
+	ID3D12CommandAllocator*		mListAllocators[LISTS_PER_FRAME] = { nullptr };*/
 
-	void CreateCommandListAndAllocator(QueueType type, D3D12DevPtr dev)
+	D3D12GraphicsCommandListPtr* mCommandLists;
+	ID3D12CommandAllocator**     mAllocators;
+	int mListSize = 1;
+
+	void CreateCommandListAndAllocator(QueueType type, D3D12DevPtr dev, int amount = 1)
 	{
+		HRESULT hr      = S_OK;
+		mCommandLists   = new D3D12GraphicsCommandListPtr[amount];
+		mAllocators     = new ID3D12CommandAllocator*[amount];
+		mListSize       = amount;
+
 		D3D12_COMMAND_LIST_TYPE listType = D3D12_COMMAND_LIST_TYPE_DIRECT;
 		if (type == QT_COMP) { listType = D3D12_COMMAND_LIST_TYPE_COMPUTE; }
 
-		HRESULT hr = dev->CreateCommandAllocator(listType, IID_PPV_ARGS(&mAllocator));
+		/*HRESULT hr = dev->CreateCommandAllocator(listType, IID_PPV_ARGS(&mAllocator));*/
+
+
 
 		//Create command list.
-		hr = dev->CreateCommandList(
+	/*	hr = dev->CreateCommandList(
 			0,
 			listType,
 			mAllocator,
 			nullptr,
-			IID_PPV_ARGS(&mCommandList));
+			IID_PPV_ARGS(&mCommandList));*/
 
 		//Command lists are created in the recording state. Since there is nothing to
 		//record right now and the main loop expects it to be closed, we close it.
-		mCommandList->Close();
+		//mCommandList->Close();
+
+		for (int i = 0; i < mListSize; ++i) {
+			hr = dev->CreateCommandAllocator(listType, IID_PPV_ARGS(&mAllocators[i]));
+
+			hr = dev->CreateCommandList(
+				0,
+				listType,
+				mAllocators[i],
+				nullptr,
+				IID_PPV_ARGS(&mCommandLists[i]));
+
+			mCommandLists[i]->Close();
+		}
+
 
 #ifdef _DEBUG
 		//HRESULT hr = S_OK;
-		if (type == QT_DIR)
-			hr = mAllocator->SetName(L"Direct Allocator");
-		if (type == QT_COMP)
-			hr = mAllocator->SetName(L"Compute Allocator");
+		LPCWSTR name[] = {(type == QT_COMP) ? L"Compute Allocator" : L"Direct Allocator"};
+		for (int i = 0; i < mListSize; ++i) {
+			hr = mAllocators[i]->SetName(*name);
+		}
 #endif
 
 	}
 
+	// todo release new allocators and lists
 	void Release()
 	{
-		SafeRelease(&mAllocator);
-		SafeRelease(&mCommandList);
+		//SafeRelease(&mAllocator);
+		//SafeRelease(&mCommandList);
+
+		for (int i = 0; i < mListSize; ++i) {
+			SafeRelease(&mAllocators[i]);
+			SafeRelease(&mCommandLists[i]);
+		}
+
+		delete[] mCommandLists;
+		mCommandLists= NULL;
+
+		delete[] mAllocators;
+		mAllocators = NULL;
 	}
 };
 
@@ -146,7 +186,7 @@ struct PerFrame
 
 	void CreateCommandListsAndAllocators(D3D12DevPtr dev)
 	{
-		mAllocatorsAndLists[GEOMETRY_STAGE].CreateCommandListAndAllocator(QT_DIR, dev);
+		mAllocatorsAndLists[GEOMETRY_STAGE].CreateCommandListAndAllocator(QT_DIR, dev, LISTS_PER_FRAME);
 		mAllocatorsAndLists[FXAA_STAGE].CreateCommandListAndAllocator(QT_COMP, dev);
 		mAllocatorsAndLists[PRESENT_STAGE].CreateCommandListAndAllocator(QT_DIR, dev);
 	}

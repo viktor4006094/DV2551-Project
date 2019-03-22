@@ -2,6 +2,7 @@
 
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <ctime>
 
 GameStateHandler::GameStateHandler()
 {
@@ -41,7 +42,7 @@ void GameStateHandler::CreatePerMeshData()
 		//cbData[i].world = DirectX::XMFLOAT4X4{ 0,0,0,0,0,0,0,0,0,0,0,0,i % 100,0,i / 100,1 };//DirectX::XMMatrixTranslation((i % 100), 0, (i / 40));
 		//writeState.meshes.push_back(m);
 	}
-	srand(time(NULL));
+	srand(static_cast<unsigned int>(std::time(0)));
 	for (int i = 4; i < TOTAL_DRAGONS; i++) {
 		float a, b, c;
 		a =((float)rand())/(float)RAND_MAX; 
@@ -80,7 +81,7 @@ void GameStateHandler::Update(int id)
 			for (int m = 0; m < TOTAL_DRAGONS; m++) {
 				if (m < 4) {
 					//Update world matrixes of each mesh
-					DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-1.0 / (tickRate * 5.0));
+					DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-1.0f / static_cast<float>(tickRate * 5.0f));
 					//DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-delta / 5000.0);
 					DirectX::XMStoreFloat4x4(&cbData[m].world, temp);
 					DirectX::XMStoreFloat4x4(&cbData[m].viewProj, DirectX::XMMatrixTranspose(viewMat*projMat));;
@@ -95,7 +96,7 @@ void GameStateHandler::Update(int id)
 					float speed = ((colInd % 4) + 1) * 1.0f;
 
 
-					DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(dir / (tickRate *speed));
+					DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(dir / static_cast<float>(tickRate * speed));
 					DirectX::XMStoreFloat4x4(&cbData[m].world, temp);
 					DirectX::XMStoreFloat4x4(&cbData[m].viewProj, DirectX::XMMatrixTranspose(viewMat*projMat));;
 
