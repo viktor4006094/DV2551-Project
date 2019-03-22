@@ -12,5 +12,5 @@ public:
 
 	void Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, Project* p);
 private:
-
+	UINT mDescriptorHandleSize = 0;
 };

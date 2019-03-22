@@ -286,9 +286,9 @@ void FXAA_main(
 	// TOP LEFT CORNER
 	// 3x zoomed in with FXAA on one half
 	if (orig_uv[0] > 0.2 && orig_uv[0] <= (0.2 + 1.0 / 6.0) && 
-		orig_uv[1] >= 0.1 && orig_uv[1] <= (0.1 + 1.0 / 6.0)) {
+		orig_uv[1] >= 0.04 && orig_uv[1] <= (0.04 + 1.0 / 6.0)) {
 
-		float2 adjusted_pos = (screen_pos - float2(screenSize.x / 5.0, screenSize.y / 10.0))*3.0;
+		float2 adjusted_pos = (screen_pos - float2(screenSize.x / 5.0, screenSize.y / 25.0))*3.0;
 		
 		// Turn off FXAA on the left half
 		if (adjusted_pos.x < screenSize.x/4.0)

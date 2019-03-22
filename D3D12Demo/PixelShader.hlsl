@@ -35,12 +35,12 @@ float4 PS_main( VSOut input ) : SV_TARGET0
     float weakLightBrightness = 0.2;
 
     float diff_coef = max(dot(normalize(strongLightDir), normOut), 0.0);
-    float3 diff_comp = (1.0 - AMBIENT) * diff_coef * strongLightBrightness * input.color;
+    float3 diff_comp = (1.0 - AMBIENT) * diff_coef * strongLightBrightness * input.color.rgb;
 
     diff_coef = max(dot(normalize(weakLightDir), normOut), 0.0);
-    diff_comp += (1.0 - AMBIENT) * diff_coef * weakLightBrightness * input.color;
+    diff_comp += (1.0 - AMBIENT) * diff_coef * weakLightBrightness * input.color.rgb;
 
-    float3 amb_comp = AMBIENT * input.color;
+    float3 amb_comp = AMBIENT * input.color.rgb;
 
     float3 finalColor = saturate(diff_comp + amb_comp);
 	//float3 finalColor = saturate(dot(normalize(float3(250.0, 450.0, -450.0)), normOut)*color.xyz);

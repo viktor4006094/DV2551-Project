@@ -15,9 +15,11 @@ const unsigned int NUM_THREADS = 10;
 
 const unsigned int MAX_FRAME_LATENCY = 3;
 
+
 // TOTAL_TRIS pretty much decides how many drawcalls in a brute force approach.
 constexpr int TOTAL_DRAGONS = 104;
-
+constexpr unsigned int LISTS_PER_FRAME = 5;
+const unsigned int DRAGONS_PER_LIST = (TOTAL_DRAGONS / LISTS_PER_FRAME);
 
 static const double gMovementSpeed = 0.1;
 

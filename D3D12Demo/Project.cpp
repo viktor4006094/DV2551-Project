@@ -82,7 +82,7 @@ void Project::Start()
 	gThreadPool->push([this](int id) {mGameStateHandler.Update(id); });
 	gThreadPool->push([this](int id) {this->Render(id); });
 #ifdef RECORD_TIME
-	gCommandQueues[QT_DIR].mQueue->GetClockCalibration(&mClockCalibration.gpuTimeStamp, &mClockCalibration.cpuTimeStamp);
+	gCommandQueues[QT_DIR]->GetClockCalibration(&mClockCalibration.gpuTimeStamp, &mClockCalibration.cpuTimeStamp);
 #endif
 }
 
@@ -499,8 +499,8 @@ void Project::UploadMeshData()
 	gNormalStagingBufferResource->Unmap(0, nullptr);
 
 	// copy pointers for easier to read code
-	ID3D12CommandAllocator*		dirAllo = gPerFrameAllocatorsListsAndResources[0].mAllocatorsAndLists[GEOMETRY_STAGE].mAllocator;
-	D3D12GraphicsCommandListPtr dirList = gPerFrameAllocatorsListsAndResources[0].mAllocatorsAndLists[GEOMETRY_STAGE].mCommandList;
+	ID3D12CommandAllocator*		dirAllo = gPerFrameAllocatorsListsAndResources[0].mAllocatorsAndLists[GEOMETRY_STAGE].mAllocators[0];
+	D3D12GraphicsCommandListPtr dirList = gPerFrameAllocatorsListsAndResources[0].mAllocatorsAndLists[GEOMETRY_STAGE].mCommandLists[0];
 
 	//gAllocatorsAndLists[0][GEOMETRY_STAGE].mCommandList->Reset(gAllocatorsAndLists[0][GEOMETRY_STAGE].mAllocator, NULL);
 	dirList->Reset(dirAllo, NULL);
@@ -515,7 +515,7 @@ void Project::UploadMeshData()
 	barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
 	barrierDesc.Transition.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
 
-	gPerFrameAllocatorsListsAndResources[0].mAllocatorsAndLists[GEOMETRY_STAGE].mCommandList->ResourceBarrier(1, &barrierDesc);
+	dirList->ResourceBarrier(1, &barrierDesc);
 
 	barrierDesc.Transition.pResource = gVertexBufferNormalResource;
 	dirList->ResourceBarrier(1, &barrierDesc);
@@ -809,8 +809,8 @@ void Project::CopyComputeOutputToBackBuffer(UINT64 frameIndex, int swapBufferInd
 	UINT backBufferIndex = gSwapChain4->GetCurrentBackBufferIndex();
 
 	PerFrame* frame = &gPerFrameAllocatorsListsAndResources[swapBufferIndex];
-	ID3D12CommandAllocator*     dirAllo = frame->mAllocatorsAndLists[PRESENT_STAGE].mAllocator;
-	D3D12GraphicsCommandListPtr dirList = frame->mAllocatorsAndLists[PRESENT_STAGE].mCommandList;
+	ID3D12CommandAllocator*     dirAllo = frame->mAllocatorsAndLists[PRESENT_STAGE].mAllocators[0];
+	D3D12GraphicsCommandListPtr dirList = frame->mAllocatorsAndLists[PRESENT_STAGE].mCommandLists[0];
 
 
 	dirAllo->Reset();
@@ -853,13 +853,6 @@ void Project::CopyComputeOutputToBackBuffer(UINT64 frameIndex, int swapBufferInd
 	//Close the list to prepare it for execution.
 	dirList->Close();
 
-
-	//if (gThreadFences[threadIndex]->GetCompletedValue() < gThreadFenceValues[threadIndex]) {
-	//	gThreadFences[threadIndex]->SetEventOnCompletion(gThreadFenceValues[threadIndex], gThreadFenceEvents[threadIndex]);
-	//	WaitForSingleObject(gThreadFenceEvents[threadIndex], INFINITE);
-	//}
-
-
 	// Wait for the FXAA stage to be finished
 	gCommandQueues[QT_DIR]->Wait(gSwapBufferFences[swapBufferIndex], gSwapBufferFenceValues[swapBufferIndex]);
 
@@ -877,29 +870,22 @@ void Project::Render(int id)
 	thread_local int threadIndex;
 	thread_local UINT64 frameIndex;
 
-
 	// get the value used to ensure that frames are presented in the correct order
-	frameIndex = frameCounter;
-	frameCounter++;
-
+	frameIndex = frameCounter++;
 
 	// Wait for the swap chain so that no more than MAX_FRAME_LATENCY frames are being processed simultaneously
 	// See MAX_FRAME_LATENCY in ConstantsAndGlobals.hpp for the specified amount
 	WaitForSingleObjectEx(gSwapChainWaitableObject, 1000, true);
 
-	// todo: remove unused stuff
-	//get the thread index
-	gThreadIDIndexLock.lock();
 	CountFPS(mWndHandle);
 	
+	//get the swap buffer index
 	swapBufferIndex = lastRenderIterationSwapBufferIndex;
 	lastRenderIterationSwapBufferIndex = (++lastRenderIterationSwapBufferIndex) % NUM_SWAP_BUFFERS;
 
+	//get the thread index
 	threadIndex = lastRenderIterationThreadIndex;
 	lastRenderIterationThreadIndex = (++lastRenderIterationThreadIndex) % NUM_THREADS;
-
-	gThreadIDIndexLock.unlock();
-
 
 	if (isRunning) {
 		////////// Render geometry section //////////
@@ -908,13 +894,10 @@ void Project::Render(int id)
 		GPUStages[0]->Run(frameIndex, swapBufferIndex, threadIndex, this);
 
 		// Signal that the geometry stage is finished
-		UINT64 fenceValue = InterlockedIncrement(&gSwapBufferFenceValues[swapBufferIndex]);
-		gCommandQueues[QT_DIR]->Signal(gSwapBufferFences[swapBufferIndex], fenceValue);
+		gCommandQueues[QT_DIR]->Signal(gSwapBufferFences[swapBufferIndex], ++gSwapBufferFenceValues[swapBufferIndex]);
 
 		// Begin the rendering of the next frame once the first part of this frame is done.
 		gThreadPool->push([this](int id) {Render(id); });
-
-
 
 		////////// FXAA section //////////
 
@@ -922,8 +905,7 @@ void Project::Render(int id)
 		GPUStages[1]->Run(frameIndex, swapBufferIndex, threadIndex, this);
 
 		// Signal that the FXAA stage is finished
-		fenceValue = InterlockedIncrement(&gSwapBufferFenceValues[swapBufferIndex]);
-		gCommandQueues[QT_COMP]->Signal(gSwapBufferFences[swapBufferIndex], fenceValue);
+		gCommandQueues[QT_COMP]->Signal(gSwapBufferFences[swapBufferIndex], ++gSwapBufferFenceValues[swapBufferIndex]);
 
 
 		////////// Present section //////////
