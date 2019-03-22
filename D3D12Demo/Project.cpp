@@ -94,60 +94,26 @@ void Project::Stop()
 
 void Project::Shutdown()
 {
+	//todo wait for gpu here instead of sleep in main()
 	mGameStateHandler.ShutDown();
 
 
-
-	//WaitForGpu(QT_DIR); //todo DON'T
-
-	//for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
 	gConstantBufferResource->Unmap(0, nullptr);
-	//}
-
-	//CloseHandle(gEventHandle);
 
 
 	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
-		//for (int j = 0; j < NUM_STAGES_IN_FRAME; ++j) {
 		gPerFrameAllocatorsListsAndResources[i].Release();
 		SafeRelease(&gSwapBufferFences[i]);
-		//SafeRelease(&gBackBufferFenceEvent[i]);
-		//gAllocatorsAndLists[i][j].Release();
-		//}
-	}
-
-	//gGraphicsQueue.Release();
-	//gCopyQueue.Release();
-	//gComputeQueue.Release();
-
-	//SafeRelease(&gGraphicsQueue);
-	//SafeRelease(&gCopyQueue);
-	//SafeRelease(&gComputeQueue);
-	//SafeRelease(&gCommandAllocator);
-	//SafeRelease(&gGraphicsCommandList);
-	//SafeRelease(&gCopyCommandList);
-	//SafeRelease(&gComputeCommandList);
-	SafeRelease(&gSwapChain4);
-
-	//SafeRelease(&gFence);
-
-	SafeRelease(&gSwapChainRenderTargetsDescHeap);
-	for (int i = 0; i < NUM_SWAP_BUFFERS; i++)
-	{
-		SafeRelease(&gConstantBufferDescriptorHeap);
-		SafeRelease(&gConstantBufferResource);
 		SafeRelease(&gSwapChainRenderTargets[i]);
-		
-		//gIntermediateRenderTargets[i]->Release();
-		//gUAVResources[i]->Release();
-		//gPerFrameResources[i].Release();
-		//SafeRelease(&gSwapChainRenderTargets[i]);
 	}
 
+	SafeRelease(&gSwapChain4);
+	SafeRelease(&gSwapChainRenderTargetsDescHeap);
+	SafeRelease(&gConstantBufferDescriptorHeap);
+	SafeRelease(&gConstantBufferResource);
 	SafeRelease(&gDevice5);
 	SafeRelease(&gCommandQueues[0]);
 	SafeRelease(&gCommandQueues[1]);
-	//SafeRelease(&gRenderPipeLineState);
 	SafeRelease(&depthStencilBuffer);
 	SafeRelease(&dsDescriptorHeap);
 	SafeRelease(&gVertexBufferResource);
@@ -158,8 +124,7 @@ void Project::Shutdown()
 	SafeRelease(&gBackBufferFence);
 	SafeRelease(&gIntermediateRenderTargetsDescHeap);
 	SafeRelease(&gComputeDescriptorHeap);
-	gThreadPool->~thread_pool();
-	//SafeRelease(&GPUStages[0].)
+
 	delete GPUStages[0];
 	delete GPUStages[1];
 	delete gThreadPool;
@@ -170,7 +135,7 @@ void Project::Shutdown()
 		dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_SUMMARY || DXGI_DEBUG_RLO_IGNORE_INTERNAL));
 		dxgiDebug->Release();
 	}
-#endif // 
+#endif
 }
 
 
