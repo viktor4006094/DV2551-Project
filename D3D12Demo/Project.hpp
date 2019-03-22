@@ -13,8 +13,13 @@
 #include "..\extLib\ctpl_stl.h"
 #include "D3D12Timer.h"
 
+//for debug
+#include <guiddef.h>
+#include <dxgidebug.h>
+
 #pragma comment (lib, "d3d12.lib")
 #pragma comment (lib, "DXGI.lib")
+#pragma comment (lib, "dxguid.lib")
 #pragma comment (lib, "d3dcompiler.lib")
 
 
@@ -51,6 +56,11 @@ public:
 	void  operator delete(void* p) { _mm_free(p); }
 
 
+	UINT dxgiFactoryFlags = 0;
+#ifdef _DEBUG
+	//Enable the D3D12 debug layer.
+	ID3D12Debug* debugController = nullptr;
+#endif
 
 	/// Global
 	ctpl::thread_pool* gThreadPool = nullptr;

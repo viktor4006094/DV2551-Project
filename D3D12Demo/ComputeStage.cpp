@@ -8,7 +8,7 @@ ComputeStage::ComputeStage()
 
 ComputeStage::~ComputeStage()
 {
-
+	SafeRelease(&mPipelineState);
 }
 
 void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)

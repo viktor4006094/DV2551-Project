@@ -8,6 +8,7 @@
 
 #include <sstream>
 
+
 Project::Project()
 {
 }
@@ -104,14 +105,13 @@ void Project::Shutdown()
 	//}
 
 	//CloseHandle(gEventHandle);
-	SafeRelease(&gDevice5);
 
-	SafeRelease(&gCommandQueues[0]);
-	SafeRelease(&gCommandQueues[1]);
 
 	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
 		//for (int j = 0; j < NUM_STAGES_IN_FRAME; ++j) {
 		gPerFrameAllocatorsListsAndResources[i].Release();
+		SafeRelease(&gSwapBufferFences[i]);
+		//SafeRelease(&gBackBufferFenceEvent[i]);
 		//gAllocatorsAndLists[i][j].Release();
 		//}
 	}
@@ -136,6 +136,7 @@ void Project::Shutdown()
 	{
 		SafeRelease(&gConstantBufferDescriptorHeap);
 		SafeRelease(&gConstantBufferResource);
+		SafeRelease(&gSwapChainRenderTargets[i]);
 		
 		//gIntermediateRenderTargets[i]->Release();
 		//gUAVResources[i]->Release();
@@ -143,11 +144,33 @@ void Project::Shutdown()
 		//SafeRelease(&gSwapChainRenderTargets[i]);
 	}
 
-	SafeRelease(&gRootSignature);
+	SafeRelease(&gDevice5);
+	SafeRelease(&gCommandQueues[0]);
+	SafeRelease(&gCommandQueues[1]);
 	//SafeRelease(&gRenderPipeLineState);
 	SafeRelease(&depthStencilBuffer);
 	SafeRelease(&dsDescriptorHeap);
 	SafeRelease(&gVertexBufferResource);
+	SafeRelease(&gVertexBufferNormalResource);
+	SafeRelease(&gVertexStagingBufferResource);
+	SafeRelease(&gNormalStagingBufferResource);
+	SafeRelease(&gRootSignature);
+	SafeRelease(&gBackBufferFence);
+	SafeRelease(&gIntermediateRenderTargetsDescHeap);
+	SafeRelease(&gComputeDescriptorHeap);
+	gThreadPool->~thread_pool();
+	//SafeRelease(&GPUStages[0].)
+	delete GPUStages[0];
+	delete GPUStages[1];
+	delete gThreadPool;
+
+#ifdef _DEBUG
+	IDXGIDebug1* dxgiDebug = nullptr;
+	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiDebug)))) {
+		dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_SUMMARY || DXGI_DEBUG_RLO_IGNORE_INTERNAL));
+		dxgiDebug->Release();
+	}
+#endif // 
 }
 
 
@@ -169,6 +192,8 @@ void Project::CreateDirect3DDevice(HWND wndHandle)
 	if (SUCCEEDED(f(IID_PPV_ARGS(&debugController))))
 	{
 		debugController->EnableDebugLayer();
+		dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+
 	}
 	SafeRelease(&debugController);
 #endif

@@ -9,7 +9,7 @@ RenderStage::RenderStage()
 
 RenderStage::~RenderStage()
 {
-
+	SafeRelease(&mPipelineState);
 }
 
 void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)

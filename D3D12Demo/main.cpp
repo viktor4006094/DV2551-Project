@@ -6,8 +6,13 @@
 // 181009: Stefan Petersson, cleanups/updates DXGI 1.6
 //--------------------------------------------------------------------------------------
 
+
+#define _CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>
 #include <windows.h>
 #include "Project.hpp"
+
 
 
 #pragma region ForwardDeclerations
@@ -18,7 +23,9 @@ LRESULT CALLBACK	WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 #pragma region wwinMain
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLine, int nCmdShow)
 {
-	
+#ifdef _DEBUG
+	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+#endif
 	HWND gWndHandle;
 	Project* project = new Project();
 
@@ -45,7 +52,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 	project->Shutdown();
 	
 	delete project;
-
+	//_CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG);
+	//_CrtDumpMemoryLeaks();
+	
 	return (int)msg.wParam;
 }
 #pragma endregion
