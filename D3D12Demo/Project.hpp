@@ -1,3 +1,5 @@
+// todo rename swap buffer to frame buffer
+
 #pragma once
 #include "ConstantsAndGlobals.hpp"
 #include "StructsAndEnums.hpp"

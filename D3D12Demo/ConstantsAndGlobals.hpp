@@ -30,7 +30,7 @@ const int SCREEN_HEIGHT = 3*300; //Height of application.
 //const FLOAT gClearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
 const FLOAT gClearColor[] = { 0.0f, 0.16f, 0.21f, 1.0f };
 
-const unsigned int NUM_SWAP_BUFFERS = MAX_FRAME_LATENCY + 2; //Number of buffers
+const unsigned int NUM_SWAP_BUFFERS = MAX_FRAME_LATENCY + 1; //Number of buffers
 
 const unsigned int NUM_STAGES_IN_FRAME = 3;
 
