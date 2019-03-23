@@ -861,6 +861,7 @@ void Project::Render(int id)
 		// Signal that the geometry stage is finished
 		gCommandQueues[QT_DIR]->Signal(gSwapBufferFences[swapBufferIndex], ++gSwapBufferFenceValues[swapBufferIndex]);
 
+
 		// Begin the rendering of the next frame once the first part of this frame is done.
 		gThreadPool->push([this](int id) {Render(id); });
 
@@ -873,14 +874,16 @@ void Project::Render(int id)
 		gCommandQueues[QT_COMP]->Signal(gSwapBufferFences[swapBufferIndex], ++gSwapBufferFenceValues[swapBufferIndex]);
 
 
+
 		////////// Present section //////////
 
-		// Wait for the previous frame to have been presented
+		// Wait for the previous frame to have been sent to present
 		if (gBackBufferFence->GetCompletedValue() < frameIndex) {
 			gBackBufferFence->SetEventOnCompletion(frameIndex, gBackBufferFenceEvent[swapBufferIndex]);
 			WaitForSingleObject(gBackBufferFenceEvent[swapBufferIndex], INFINITE);
 		}
 		//gCommandQueues[QT_DIR].mQueue->Wait(gBackBufferFence, frameIndex);
+
 
 
 		// Lock this section since if Present is called in another thread whilst in this section the backbufferIndex 
@@ -959,11 +962,11 @@ void Project::Render(int id)
 
 			sprintf_s(buffer, "%% GPU frame: %d\n", frame);
 			fprintf(f, "%s", buffer);
-			sprintf_s(buffer, "\\addplot[geomStyle%s] coordinates{ (%.6f,1.75) (%.6f,1.75) }; \n", numberStr[(i % 3)].c_str(), gpuTimes[0][0], gpuTimes[0][1]);
+			sprintf_s(buffer, "\\addplot[geomStyle%s] coordinates{ (%.6f,2) (%.6f,2) }; \n", numberStr[(i % 3)].c_str(), gpuTimes[0][0], gpuTimes[0][1]);
 			fprintf(f, "%s", buffer);
-			sprintf_s(buffer, "\\addplot[fxaaStyle%s] coordinates{ (%.6f,2) (%.6f,2) }; \n", numberStr[(i % 3)].c_str(), gpuTimes[1][0], gpuTimes[1][1]);
+			sprintf_s(buffer, "\\addplot[fxaaStyle%s] coordinates{ (%.6f,1.75) (%.6f,1.75) }; \n", numberStr[(i % 3)].c_str(), gpuTimes[1][0], gpuTimes[1][1]);
 			fprintf(f, "%s", buffer);
-			sprintf_s(buffer, "\\addplot[presStyle%s] coordinates{ (%.6f,1.75) (%.6f,1.75) }; \n\n", numberStr[(i % 3)].c_str(), gpuTimes[2][0], gpuTimes[2][1]);
+			sprintf_s(buffer, "\\addplot[presStyle%s] coordinates{ (%.6f,2) (%.6f,2) }; \n\n", numberStr[(i % 3)].c_str(), gpuTimes[2][0], gpuTimes[2][1]);
 			fprintf(f, "%s", buffer);
 		}
 		fclose(f);
