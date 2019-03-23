@@ -34,9 +34,6 @@ const unsigned int NUM_SWAP_BUFFERS = MAX_FRAME_LATENCY + 2; //Number of buffers
 
 const unsigned int NUM_STAGES_IN_FRAME = 3;
 
-static std::mutex gThreadIDIndexLock;
-static std::mutex gBufferTransferLock;
-
 static std::mutex gPresentLock;
 
 const unsigned int FIRST_TIMESTAMPED_FRAME = 1;
