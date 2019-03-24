@@ -73,8 +73,6 @@ void Project::Init(HWND wndHandle)
 	gpuTimer[2].init(gDevice5, 100);
 #endif
 
-	// todo: remove this function and inline it here
-	//WaitForGpu(QT_DIR);
 }
 
 void Project::Start()
@@ -514,8 +512,8 @@ void Project::CreateRootSignature()
 	D3D12_DESCRIPTOR_RANGE  dtRanges[1];
 	dtRanges[0].RangeType			= D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	dtRanges[0].NumDescriptors		= 1;
-	dtRanges[0].BaseShaderRegister	= 0; //register b0
-	dtRanges[0].RegisterSpace		= 0; //register(b0,space0);
+	dtRanges[0].BaseShaderRegister	= 0; //register t0
+	dtRanges[0].RegisterSpace		= 0; //register(t0,space0);
 	dtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// Compute shader UAV
@@ -544,7 +542,7 @@ void Project::CreateRootSignature()
 
 	// constant buffer
 	rootParam[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParam[0].Descriptor = { 0, 0 }; // b0, s0
+	rootParam[0].Descriptor = { 0, 0 }; // (b0, space0)
 	rootParam[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 
 	// input texture of compute shader
@@ -571,7 +569,7 @@ void Project::CreateRootSignature()
 	bilinearSampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
 	bilinearSampler.MinLOD = 0.0f;
 	bilinearSampler.MaxLOD = D3D12_FLOAT32_MAX;
-	bilinearSampler.ShaderRegister = 0;
+	bilinearSampler.ShaderRegister = 0; // (s0)
 	bilinearSampler.RegisterSpace = 0;
 	bilinearSampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 

@@ -8,7 +8,7 @@
 #include <vector>
 
 
-//#define VETTIG_DATOR
+#define VETTIG_DATOR
 //#define RECORD_TIME
 
 const unsigned int NUM_THREADS = 12;
