@@ -257,7 +257,7 @@
     <ClInclude Include="GPUStage.hpp" />
     <ClInclude Include="RenderStage.hpp" />
     <ClInclude Include="StructsAndEnums.hpp" />
-    <ClInclude Include="ConstantsAndGlobals.hpp" />
+    <ClInclude Include="GlobalSettings.hpp" />
     <ClInclude Include="Project.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

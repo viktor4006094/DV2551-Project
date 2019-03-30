@@ -837,7 +837,7 @@ void Project::Render(int id)
 	frameIndex = frameCounter++;
 
 	// Wait for the swap chain so that no more than MAX_FRAME_LATENCY frames are being processed simultaneously
-	// See MAX_FRAME_LATENCY in ConstantsAndGlobals.hpp for the specified amount
+	// See MAX_FRAME_LATENCY in GlobalSettings.hpp for the specified amount
 	WaitForSingleObjectEx(gSwapChainWaitableObject, 1000, true);
 
 	CountFPS(mWndHandle);
@@ -880,8 +880,6 @@ void Project::Render(int id)
 			gBackBufferFence->SetEventOnCompletion(frameIndex, gBackBufferFenceEvent[swapBufferIndex]);
 			WaitForSingleObject(gBackBufferFenceEvent[swapBufferIndex], INFINITE);
 		}
-		//gCommandQueues[QT_DIR].mQueue->Wait(gBackBufferFence, frameIndex);
-
 
 
 		// Lock this section since if Present is called in another thread whilst in this section the backbufferIndex 
@@ -902,6 +900,8 @@ void Project::Render(int id)
 		gPresentLock.unlock();
 	}
 #ifdef RECORD_TIME
+
+	// Save timestamps to file in a format that can be used in pgfplots
 	if (frameIndex == FIRST_TIMESTAMPED_FRAME + 2*NUM_TIMESTAMP_PAIRS) {
 		UINT64 gpuEpoch = mClockCalibration.gpuTimeStamp;
 		UINT64 gpuFreq;

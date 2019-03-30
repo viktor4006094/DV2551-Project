@@ -1,7 +1,7 @@
 #pragma once
 
 #include <d3d12.h>
-#include "ConstantsAndGlobals.hpp"
+#include "GlobalSettings.hpp"
 #include <DirectXMath.h>
 #include <d3dtypes.h>
 #include <string>

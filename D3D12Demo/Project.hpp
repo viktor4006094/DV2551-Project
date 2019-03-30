@@ -1,7 +1,7 @@
 // todo rename swap buffer to frame buffer
 
 #pragma once
-#include "ConstantsAndGlobals.hpp"
+#include "GlobalSettings.hpp"
 #include "StructsAndEnums.hpp"
 #include "GameStateHandler.hpp"
 #include "GPUStage.hpp"

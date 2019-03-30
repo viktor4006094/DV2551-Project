@@ -91,11 +91,11 @@
     <ClInclude Include="StructsAndEnums.hpp">
       <Filter>Header Files\Common</Filter>
     </ClInclude>
-    <ClInclude Include="ConstantsAndGlobals.hpp">
-      <Filter>Header Files\Common</Filter>
-    </ClInclude>
     <ClInclude Include="D3D12Timer.h">
       <Filter>Header Files\D3D12Timer</Filter>
+    </ClInclude>
+    <ClInclude Include="GlobalSettings.hpp">
+      <Filter>Header Files\Common</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
