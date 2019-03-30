@@ -1,6 +1,5 @@
-// todo rename swap buffer to frame buffer
-
 #pragma once
+
 #include "GlobalSettings.hpp"
 #include "StructsAndEnums.hpp"
 #include "GameStateHandler.hpp"
@@ -53,6 +52,12 @@ public:
 	void CopyComputeOutputToBackBuffer(UINT64 frameIndex, int swapBufferIndex, int threadIndex);
 	void Render(int id);
 
+
+#ifdef RECORD_TIME
+	void WriteTimeStampsToFile();
+#endif
+
+
 	// ensure 256 bit alignment for the constant buffer
 	void* operator new(size_t i)   { return _mm_malloc(i, 256); }
 	void  operator delete(void* p) { _mm_free(p); }
@@ -71,7 +76,7 @@ public:
 	HWND mWndHandle;
 	
 	/// Global D3D
-	D3D12DevPtr				gDevice5 = nullptr; // ID3D12Device
+	D3D12DevPtr				gDevice = nullptr; // ID3D12Device
 
 	ID3D12CommandQueue*		gCommandQueues[2];			// One Direct and one Compute queue
 	ID3D12RootSignature*	gRootSignature = nullptr;	// only one root signature needed
@@ -120,10 +125,14 @@ public:
 	HANDLE gBackBufferFenceEvent[NUM_SWAP_BUFFERS] = { nullptr };
 
 	// Fences used within frames for synchronization between the direct and compute queue
-	ID3D12Fence1* gSwapBufferFences[NUM_SWAP_BUFFERS] = { nullptr };
-	UINT64 gSwapBufferFenceValues[NUM_SWAP_BUFFERS]   = { 0 };
+	ID3D12Fence1* gFrameFences[NUM_SWAP_BUFFERS] = { nullptr };
+	UINT64 gFrameFenceValues[NUM_SWAP_BUFFERS]   = { 0 };
 
+
+	// For shutting down the application
 	bool isRunning = true;
+	LONG volatile closedThreads = 0;
+
 
 #ifdef RECORD_TIME
 	D3D12::D3D12Timer gpuTimer[3];

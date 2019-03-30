@@ -36,16 +36,16 @@ void GameStateHandler::CreatePerMeshData()
 		DirectX::XMStoreFloat4x4(
 			&cbData[i].world,
 			DirectX::XMMatrixTranspose(
-				DirectX::XMMatrixScaling(2.0f, 2.0f, 2.0f)* DirectX::XMMatrixTranslation((i / 2) * 30.0f - 15.0f, (i % 2) * 24.0f - 12.0f, 0.0f)
+				DirectX::XMMatrixScaling(2.0f, 2.0f, 2.0f) * DirectX::XMMatrixTranslation((i / 2) * 30.0f - 15.0f, (i % 2) * 24.0f - 12.0f, 0.0f)
 			)
 		);
-		//cbData[i].world = DirectX::XMFLOAT4X4{ 0,0,0,0,0,0,0,0,0,0,0,0,i % 100,0,i / 100,1 };//DirectX::XMMatrixTranslation((i % 100), 0, (i / 40));
-		//writeState.meshes.push_back(m);
 	}
+
 	srand(static_cast<unsigned int>(std::time(0)));
+	
 	for (int i = 4; i < TOTAL_DRAGONS; i++) {
 		float a, b, c;
-		a =((float)rand())/(float)RAND_MAX; 
+		a = ((float)rand()) / (float)RAND_MAX;
 		b = ((float)rand()) / (float)RAND_MAX;
 		c = ((float)rand()) / (float)RAND_MAX;
 		cbData[i].color = float4{ a, b, c, 1.0f };
@@ -75,14 +75,13 @@ void GameStateHandler::Update(int id)
 		if (t >= 1000.0 / tickRate) {
 			int meshInd = 0;
 			static long long shift = 0;
-			static double dshift = 0.0;
-			static double delta = 0.0;
+			static double dshift   = 0.0;
+			static double delta    = 0.0;
 
 			for (int m = 0; m < TOTAL_DRAGONS; m++) {
 				if (m < 4) {
 					//Update world matrixes of each mesh
 					DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-1.0f / static_cast<float>(tickRate * 5.0f));
-					//DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(-delta / 5000.0);
 					DirectX::XMStoreFloat4x4(&cbData[m].world, temp);
 					DirectX::XMStoreFloat4x4(&cbData[m].viewProj, DirectX::XMMatrixTranspose(viewMat*projMat));;
 
@@ -98,8 +97,7 @@ void GameStateHandler::Update(int id)
 
 					DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(dir / static_cast<float>(tickRate * speed));
 					DirectX::XMStoreFloat4x4(&cbData[m].world, temp);
-					DirectX::XMStoreFloat4x4(&cbData[m].viewProj, DirectX::XMMatrixTranspose(viewMat*projMat));;
-
+					DirectX::XMStoreFloat4x4(&cbData[m].viewProj, DirectX::XMMatrixTranspose(viewMat*projMat));
 				}
 
 				meshInd++;

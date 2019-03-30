@@ -2,11 +2,11 @@
 
 #include "GPUStage.hpp"
 
-class ComputeStage : public GPUStage
+class FXAAStage : public GPUStage
 {
 public:
-	ComputeStage();
-	virtual ~ComputeStage();
+	FXAAStage();
+	virtual ~FXAAStage();
 
 	void Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig);
 

@@ -1,8 +1,5 @@
 /**
-* Course: DV1542 - 3D-Programming
 * Authors: Viktor Enfeldt, Peter Meunier
-*
-* File: FXAACompute.hlsl
 *
 * File summary:
 *	A hlsl version of Simon Rodriguez' OpenGL FXAA algorithm.
@@ -13,6 +10,7 @@ Texture2D<float4>   inputTex	: register(t0);
 RWTexture2D<float4> outputTex	: register(u0);
 SamplerState samp				: register(s0);
 
+// Demo mode showing off the effect of FXAA
 #define DEMO
 
 //Used for syntax highlighting
@@ -68,7 +66,6 @@ void FXAA_main(
 	
 	// Early exit for threads outside of the texture
 	if (screen_pos.x >= screenSize.x || screen_pos.y >= screenSize.y) {
-		//outputTex[screen_pos] = float4(1.0f, 1.0f, 0.0f, 1.0f);
 		return;
 	} 
 	//else { // bypass FXAA, for debugging
@@ -263,20 +260,18 @@ void FXAA_main(
 
 		result = inputTex.SampleLevel(samp, finalUV, 0.0);
 
+
+
 		// FOR DEBUGGING. Highlights detected edges
 		//result = float4(1.0, 0.0, 0.0, 0.0);
+
+
 #ifdef DEMO
 		// BOTTOM LEFT CORNER
 		// Highlight detected edges in red
 		if (orig_uv[0] < 0.5 && orig_uv[1] >= 0.5) result = float4(1.0, 1.0, 1.0, 1.0);
 #endif
-
-		// FOR DEBUGGING
 	}
-
-
-	//// Turn off FXAA for the top left corner of the screen
-	//if (orig_uv[0] < 0.5 && orig_uv[1] < 0.5) result = inputTex[screen_pos];
 
 #ifdef DEMO
 	// BOTTOM RIGHT CORNER
@@ -298,7 +293,6 @@ void FXAA_main(
 		if (adjusted_pos.x >= screenSize.x / 4.0 - 1.0 && adjusted_pos.x <= screenSize.x / 4.0 + 1.0)
 			result = result / 2.0;
 
-
 		// Each pixel writes to 9 pixels (3x zoom)
 		outputTex[adjusted_pos] = result;
 		outputTex[adjusted_pos + float2(0.0, 1.0)] = result;
@@ -310,10 +304,6 @@ void FXAA_main(
 		outputTex[adjusted_pos + float2(2.0, 1.0)] = result;
 		outputTex[adjusted_pos + float2(2.0, 2.0)] = result;
 	}
-
-	// draw lines seperating the four corners
-	//if ((orig_uv[0] > 0.499 && orig_uv[0] < 0.501) || (orig_uv[1] > 0.499 && orig_uv[1] < 0.501))
-		//result = float4(0.0, 0.0, 0.0, 1.0);
 
 	// Output the result to all corners but the top left one since that's already been written to
 	if (orig_uv[0] >= 0.500 || orig_uv[1] > 0.5) {

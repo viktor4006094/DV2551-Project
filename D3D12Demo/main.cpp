@@ -1,18 +1,9 @@
-//--------------------------------------------------------------------------------------
-// BTH - 2018
-// 170123: Mikael Olofsson, initial version
-// 170131: Stefan Petersson, added constant buffer and some cleanups/updates
-// 180129: Stefan Petersson, cleanups/updates DXGI 1.5
-// 181009: Stefan Petersson, cleanups/updates DXGI 1.6
-//--------------------------------------------------------------------------------------
-
+#include "Project.hpp"
 
 #define _CRTDBG_MAP_ALLOC
 #include <stdlib.h>
 #include <crtdbg.h>
 #include <windows.h>
-#include "Project.hpp"
-
 
 
 #pragma region ForwardDeclerations
@@ -42,18 +33,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 				DispatchMessage(&msg);
 			}
 		}
+		// Stop the application and wait for GPU execution to finish
 		project->Stop();
 	}
-	
-	// sleep main thread for half a second so that worker threads have time to finish executing
-	std::this_thread::sleep_for(std::chrono::milliseconds(500));
-	
-	//Wait for GPU execution to be done and then release all interfaces.
+	// Release all interfaces
 	project->Shutdown();
-	
+
 	delete project;
-	//_CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG);
-	//_CrtDumpMemoryLeaks();
+	_CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG);
+	_CrtDumpMemoryLeaks();
 	
 	return (int)msg.wParam;
 }

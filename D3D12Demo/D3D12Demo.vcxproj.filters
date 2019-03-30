@@ -42,30 +42,21 @@
     <ClCompile Include="GameStateHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ComputeStage.cpp">
-      <Filter>Source Files\GPUStages</Filter>
-    </ClCompile>
-    <ClCompile Include="RenderStage.cpp">
-      <Filter>Source Files\GPUStages</Filter>
-    </ClCompile>
     <ClCompile Include="D3D12Timer.cpp">
       <Filter>Source Files\D3D12Timer</Filter>
     </ClCompile>
+    <ClCompile Include="GeometryStage.cpp">
+      <Filter>Source Files\GPUStages</Filter>
+    </ClCompile>
+    <ClCompile Include="FXAAStage.cpp">
+      <Filter>Source Files\GPUStages</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="CS_TestShader.hlsl">
-      <Filter>Source Files\HLSL</Filter>
-    </FxCompile>
     <FxCompile Include="PixelShader.hlsl">
       <Filter>Source Files\HLSL</Filter>
     </FxCompile>
-    <FxCompile Include="PS_Passthrough.hlsl">
-      <Filter>Source Files\HLSL</Filter>
-    </FxCompile>
     <FxCompile Include="VertexShader.hlsl">
-      <Filter>Source Files\HLSL</Filter>
-    </FxCompile>
-    <FxCompile Include="VS_FullScreenTriangle.hlsl">
       <Filter>Source Files\HLSL</Filter>
     </FxCompile>
     <FxCompile Include="CS_FXAA.hlsl">
@@ -79,13 +70,7 @@
     <ClInclude Include="GameStateHandler.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="RenderStage.hpp">
-      <Filter>Header Files\GPUStages</Filter>
-    </ClInclude>
     <ClInclude Include="GPUStage.hpp">
-      <Filter>Header Files\GPUStages</Filter>
-    </ClInclude>
-    <ClInclude Include="ComputeStage.hpp">
       <Filter>Header Files\GPUStages</Filter>
     </ClInclude>
     <ClInclude Include="StructsAndEnums.hpp">
@@ -96,6 +81,12 @@
     </ClInclude>
     <ClInclude Include="GlobalSettings.hpp">
       <Filter>Header Files\Common</Filter>
+    </ClInclude>
+    <ClInclude Include="GeometryStage.hpp">
+      <Filter>Header Files\GPUStages</Filter>
+    </ClInclude>
+    <ClInclude Include="FXAAStage.hpp">
+      <Filter>Header Files\GPUStages</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

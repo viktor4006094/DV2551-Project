@@ -1,38 +1,27 @@
 #pragma once
 
-//#include "..\extLib\ctpl_stl.h"
 #include <d3d12.h>
-
 #include <thread>
 #include <mutex>
-#include <vector>
 
 
 #define VETTIG_DATOR
 //#define RECORD_TIME
 
-const unsigned int NUM_THREADS = 12;
-
-const unsigned int MAX_FRAME_LATENCY = 2;
-
-
-// TOTAL_TRIS pretty much decides how many drawcalls in a brute force approach.
 constexpr int TOTAL_DRAGONS = 104;
-constexpr unsigned int LISTS_PER_FRAME = 5;
-const unsigned int DRAGONS_PER_LIST = (TOTAL_DRAGONS / LISTS_PER_FRAME);
-
 static const double gMovementSpeed = 0.1;
 
-const int SCREEN_WIDTH  = 3*400; //Width of application.
-const int SCREEN_HEIGHT = 3*300; //Height of application.
-
-
-//const FLOAT gClearColor[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+const int SCREEN_WIDTH  = 1200; //Width of application.
+const int SCREEN_HEIGHT = 900;  //Height of application.
 const FLOAT gClearColor[] = { 0.0f, 0.16f, 0.21f, 1.0f };
 
-const unsigned int NUM_SWAP_BUFFERS = MAX_FRAME_LATENCY + 1; //Number of buffers
+const unsigned int NUM_THREADS = 12;
+const unsigned int MAX_FRAME_LATENCY = 2;
 
-const unsigned int NUM_STAGES_IN_FRAME = 3;
+constexpr unsigned int LISTS_PER_FRAME     = 5;
+constexpr unsigned int DRAGONS_PER_LIST    = (TOTAL_DRAGONS / LISTS_PER_FRAME);
+constexpr unsigned int NUM_SWAP_BUFFERS    = MAX_FRAME_LATENCY + 1; //Number of buffers
+constexpr unsigned int NUM_STAGES_IN_FRAME = 3;
 
 static std::mutex gPresentLock;
 

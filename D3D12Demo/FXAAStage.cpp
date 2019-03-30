@@ -1,24 +1,24 @@
-#include "ComputeStage.hpp"
+#include "FXAAStage.hpp"
 #include "Project.hpp"
 
-ComputeStage::ComputeStage()
+FXAAStage::FXAAStage()
 {
 
 }
 
-ComputeStage::~ComputeStage()
+FXAAStage::~FXAAStage()
 {
 	SafeRelease(&mPipelineState);
 }
 
-void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
+void FXAAStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 {
 	mDescriptorHandleSize = dev->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 	std::string widthString = std::to_string(SCREEN_WIDTH);
-	LPCSTR widthLPCSTR = widthString.c_str();
+	LPCSTR widthLPCSTR      = widthString.c_str();
 	std::string heightString = std::to_string(SCREEN_HEIGHT);
-	LPCSTR heightLPCSTR = heightString.c_str();
+	LPCSTR heightLPCSTR      = heightString.c_str();
 
 	D3D_SHADER_MACRO computeDefines[] =
 	{
@@ -26,7 +26,6 @@ void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 		"TEXTURE_HEIGHT", heightLPCSTR,
 		NULL, NULL
 	};
-
 
 	////// Shader Compiles //////
 	ID3DBlob* computeBlob;
@@ -40,13 +39,12 @@ void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 		0,				// shader compile options			// here DEBUGGING OPTIONS
 		0,				// effect compile options
 		&computeBlob,	// double pointer to ID3DBlob		
-		&errorBlob			// pointer for Error Blob messages.
+		&errorBlob		// pointer for Error Blob messages.
 						// how to use the Error blob, see here
 						// https://msdn.microsoft.com/en-us/library/windows/desktop/hh968107(v=vs.85).aspx
 	);
 
-	if (FAILED(hr))
-	{
+	if (FAILED(hr)) {
 		OutputDebugStringA((char*)errorBlob->GetBufferPointer());
 	}
 
@@ -60,15 +58,12 @@ void ComputeStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 
 
 	hr = dev->CreateComputePipelineState(&cpsd, IID_PPV_ARGS(&mPipelineState));
-	if (FAILED(hr))
-	{
-		
+	if (FAILED(hr)) {
+		OutputDebugStringA("ERROR: Failed to create compute pipeline state\n");
 	}
-
-	//todo release pointers
 }
 
-void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, Project* p)
+void FXAAStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, Project* p)
 {
 	PerFrame* frame = &p->gPerFrameAllocatorsListsAndResources[swapBufferIndex];
 	ID3D12CommandAllocator*     compAllo = frame->mAllocatorsAndLists[FXAA_STAGE].mAllocators[0];
@@ -101,7 +96,6 @@ void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, 
 	gdh.ptr += mDescriptorHandleSize * NUM_SWAP_BUFFERS;
 	compList->SetComputeRootDescriptorTable(1, gdh);
 
-
 	static const UINT squaresWide = SCREEN_WIDTH / 32U + 1;
 	static const UINT squaresHigh = SCREEN_HEIGHT / 32U + 1;
 
@@ -121,11 +115,10 @@ void ComputeStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, 
 	//Close the list to prepare it for execution.
 	compList->Close();
 
-
 	// Wait for the geometry stage to be finished
-	p->gCommandQueues[QT_COMP]->Wait(p->gSwapBufferFences[swapBufferIndex], p->gSwapBufferFenceValues[swapBufferIndex]);
+	p->gCommandQueues[QT_COMP]->Wait(p->gFrameFences[swapBufferIndex], p->gFrameFenceValues[swapBufferIndex]);
 
 	//Execute the command list.
-	ID3D12CommandList* listsToExecute2[] = { compList };
-	p->gCommandQueues[QT_COMP]->ExecuteCommandLists(ARRAYSIZE(listsToExecute2), listsToExecute2);
+	ID3D12CommandList* listsToExecute[] = { compList };
+	p->gCommandQueues[QT_COMP]->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
 }

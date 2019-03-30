@@ -1,18 +1,17 @@
-#include "RenderStage.hpp"
+#include "GeometryStage.hpp"
 #include "Project.hpp"
 
-RenderStage::RenderStage()
+GeometryStage::GeometryStage()
 {
-
 }
 
 
-RenderStage::~RenderStage()
+GeometryStage::~GeometryStage()
 {
 	SafeRelease(&mPipelineState);
 }
 
-void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
+void GeometryStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 {
 	////// Shader Compiles //////
 	ID3DBlob* vertexBlob;
@@ -47,7 +46,7 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 
 	D3D12_INPUT_ELEMENT_DESC inputElementDesc[] = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{"NOR",0,DXGI_FORMAT_R32G32B32A32_FLOAT,1,D3D12_APPEND_ALIGNED_ELEMENT,D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,0}
+		{ "NOR",      0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 	};
 
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc;
@@ -59,12 +58,12 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 
 	//Specify pipeline stages:
 	gpsd.pRootSignature = rootSig;
-	gpsd.InputLayout = inputLayoutDesc;
+	gpsd.InputLayout    = inputLayoutDesc;
 	gpsd.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	gpsd.VS.pShaderBytecode = reinterpret_cast<void*>(vertexBlob->GetBufferPointer());
-	gpsd.VS.BytecodeLength = vertexBlob->GetBufferSize();
+	gpsd.VS.BytecodeLength  = vertexBlob->GetBufferSize();
 	gpsd.PS.pShaderBytecode = reinterpret_cast<void*>(pixelBlob->GetBufferPointer());
-	gpsd.PS.BytecodeLength = pixelBlob->GetBufferSize();
+	gpsd.PS.BytecodeLength  = pixelBlob->GetBufferSize();
 
 	//Specify render target and depthstencil usage.
 	gpsd.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -80,9 +79,9 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 	// specify depth stencil state
 
 	D3D12_DEPTH_STENCIL_DESC dsd = {};
-	dsd.DepthEnable = TRUE;
+	dsd.DepthEnable    = TRUE;
 	dsd.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-	dsd.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+	dsd.DepthFunc      = D3D12_COMPARISON_FUNC_LESS;
 
 	gpsd.DepthStencilState = dsd;
 	gpsd.DSVFormat = DXGI_FORMAT_D32_FLOAT;
@@ -99,7 +98,7 @@ void RenderStage::Init(D3D12DevPtr dev, ID3D12RootSignature* rootSig)
 	dev->CreateGraphicsPipelineState(&gpsd, IID_PPV_ARGS(&mPipelineState));
 }
 
-void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, Project* p)
+void GeometryStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, Project* p)
 {
 	PerFrame* frame = &p->gPerFrameAllocatorsListsAndResources[swapBufferIndex];
 
@@ -135,93 +134,10 @@ void RenderStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex, P
 
 	//Execute the command lists.
 	p->gCommandQueues[QT_DIR]->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
-
-
-
-
-
-//
-//	dirList->Reset(dirAllo, mPipelineState);
-//
-//#ifdef RECORD_TIME
-//	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
-//		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
-//		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][0].Start);
-//
-//		// timer start
-//		p->gpuTimer[0].start(dirList, arrIndex);
-//	}
-//#endif
-//
-//	//Set root signature
-//	dirList->SetGraphicsRootSignature(p->gRootSignature);
-//
-//
-//	// Indicate that the intermediate buffer will be used as a render target
-//	SetResourceTransitionBarrier(dirList, frame->gIntermediateRenderTarget,
-//		D3D12_RESOURCE_STATE_COMMON,
-//		D3D12_RESOURCE_STATE_RENDER_TARGET
-//	);
-//
-//	//Record commands.
-//	//Get the handle for the current render target in the intermediate output buffer.
-//	D3D12_CPU_DESCRIPTOR_HANDLE cdh = p->gIntermediateRenderTargetsDescHeap->GetCPUDescriptorHandleForHeapStart();
-//	cdh.ptr += p->gRenderTargetDescriptorSize * swapBufferIndex;
-//
-//	// get a handle to the depth/stencil buffer
-//	D3D12_CPU_DESCRIPTOR_HANDLE dsvh = p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-//	dirList->ClearDepthStencilView(p->dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
-//
-//	// set and clear render targets and depth stencil
-//	dirList->OMSetRenderTargets(1, &cdh, false, &dsvh);
-//	dirList->ClearRenderTargetView(cdh, gClearColor, 0, nullptr);
-//
-//	//Set necessary states.
-//	dirList->RSSetViewports(1, &p->gViewport);
-//	dirList->RSSetScissorRects(1, &p->gScissorRect);
-//
-//	// Set the vertex buffers (positions and normals)
-//	dirList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-//	dirList->IASetVertexBuffers(0, 2, p->gVertexBufferViews);
-//
-//
-//	D3D12_GPU_VIRTUAL_ADDRESS gpuVir = p->gConstantBufferResource->GetGPUVirtualAddress();
-//
-//	for(int i = 0; i < TOTAL_DRAGONS; ++i) {
-//		// Set the per-mesh constant buffer
-//		dirList->SetGraphicsRootConstantBufferView(0, gpuVir);
-//		gpuVir += sizeof(CONSTANT_BUFFER_DATA); // todo make constant somewhere
-//
-//		dirList->DrawInstanced(300'000, 1, 0, 0);
-//	}
-//
-//	// Transition the intermediate rendertarget to common so that 
-//	SetResourceTransitionBarrier(dirList, frame->gIntermediateRenderTarget,
-//		D3D12_RESOURCE_STATE_RENDER_TARGET,
-//		D3D12_RESOURCE_STATE_COMMON
-//	);
-//
-//#ifdef RECORD_TIME
-//	if (frameIndex >= FIRST_TIMESTAMPED_FRAME && frameIndex < (NUM_TIMESTAMP_PAIRS + FIRST_TIMESTAMPED_FRAME)) {
-//		int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;
-//		// timer end
-//		p->gpuTimer[0].stop(dirList, arrIndex);
-//		p->gpuTimer[0].resolveQueryToCPU(dirList, arrIndex);
-//
-//		QueryPerformanceCounter(&p->mCPUTimeStamps[arrIndex][0].Stop);
-//	}
-//#endif
-//
-//	//Close the list to prepare it for execution.
-//	dirList->Close();
-//
-//	//Execute the command list.
-//	ID3D12CommandList* listsToExecute[] = { dirList };
-//	p->gCommandQueues[QT_DIR]->ExecuteCommandLists(ARRAYSIZE(listsToExecute), listsToExecute);
 }
 
 
-void RenderStage::RenderMeshes(int id, const UINT64 frameIndex, const int swapBufferIndex, const int threadIndex, Project* p, const int section, const bool recordTime)
+void GeometryStage::RenderMeshes(int id, const UINT64 frameIndex, const int swapBufferIndex, const int threadIndex, Project* p, const int section, const bool recordTime)
 {
 	PerFrame* frame = &p->gPerFrameAllocatorsListsAndResources[swapBufferIndex];
 	ID3D12CommandAllocator*     dirAllo = frame->mAllocatorsAndLists[GEOMETRY_STAGE].mAllocators[section];
