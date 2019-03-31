@@ -105,7 +105,7 @@ void GeometryStage::Run(UINT64 frameIndex, int swapBufferIndex, int threadIndex,
 	ID3D12CommandList* listsToExecute[LISTS_PER_FRAME];
 	std::future<void> workers[LISTS_PER_FRAME];
 
-	bool recordTime = false;''
+	bool recordTime = false;
 
 #ifdef RECORD_TIME
 	int arrIndex = frameIndex - FIRST_TIMESTAMPED_FRAME;

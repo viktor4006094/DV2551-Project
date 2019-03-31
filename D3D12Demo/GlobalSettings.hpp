@@ -5,7 +5,7 @@
 #include <mutex>
 
 
-#define VETTIG_DATOR
+//#define VETTIG_DATOR
 //#define RECORD_TIME
 
 constexpr int TOTAL_DRAGONS = 104;
