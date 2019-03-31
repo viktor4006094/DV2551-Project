@@ -285,7 +285,6 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 		}
 	}
 
-	#pragma region depthStencil
 	// depth stencil
 	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc = {};
 	dsvHeapDesc.NumDescriptors = 1;
@@ -303,7 +302,6 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 	depthOptimizedClearValue.Format = DXGI_FORMAT_D32_FLOAT;
 	depthOptimizedClearValue.DepthStencil.Depth   = 1.0f;
 	depthOptimizedClearValue.DepthStencil.Stencil = 0;
-
 
 
 	D3D12_HEAP_PROPERTIES hp = {};
@@ -333,7 +331,6 @@ void Project::CreateCommandInterfacesAndSwapChain(HWND wndHandle)
 
 
 	gDevice->CreateDepthStencilView(depthStencilBuffer, &depthStencilDesc, dsDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-	#pragma endregion
 
 	SafeRelease(&factory);
 }
@@ -488,23 +485,17 @@ void Project::UploadMeshData()
 	ID3D12CommandAllocator*		dirAllo = gPerFrameAllocatorsListsAndResources[0].mAllocatorsAndLists[GEOMETRY_STAGE].mAllocators[0];
 	D3D12GraphicsCommandListPtr dirList = gPerFrameAllocatorsListsAndResources[0].mAllocatorsAndLists[GEOMETRY_STAGE].mCommandLists[0];
 
-	//gAllocatorsAndLists[0][GEOMETRY_STAGE].mCommandList->Reset(gAllocatorsAndLists[0][GEOMETRY_STAGE].mAllocator, NULL);
 	dirList->Reset(dirAllo, NULL);
 	dirList->CopyBufferRegion(gVertexBufferResource, 0, gVertexStagingBufferResource, 0, sizeof(triangleVertices));
 	dirList->CopyBufferRegion(gVertexBufferNormalResource, 0, gNormalStagingBufferResource, 0, sizeof(triangleVertices));
 
-	//  todo change to transition helper function
-	D3D12_RESOURCE_BARRIER barrierDesc{};
-	barrierDesc.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	barrierDesc.Transition.pResource   = gVertexBufferResource;
-	barrierDesc.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	barrierDesc.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-	barrierDesc.Transition.StateAfter  = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+	SetResourceTransitionBarrier(dirList, gVertexBufferResource, 
+		D3D12_RESOURCE_STATE_COPY_DEST, 
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
-	dirList->ResourceBarrier(1, &barrierDesc);
-
-	barrierDesc.Transition.pResource = gVertexBufferNormalResource;
-	dirList->ResourceBarrier(1, &barrierDesc);
+	SetResourceTransitionBarrier(dirList, gVertexBufferNormalResource,
+		D3D12_RESOURCE_STATE_COPY_DEST,
+		D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 
 	//Initialize vertex buffer view, used in the render call.
 	gVertexBufferViews[0].BufferLocation = gVertexBufferResource->GetGPUVirtualAddress();
@@ -528,36 +519,34 @@ void Project::UploadMeshData()
 	}
 }
 
-// todo remove unused root parameters and tables
+
 void Project::CreateRootSignature()
 {
 	//define descriptor range(s)
-	D3D12_DESCRIPTOR_RANGE  dtRanges[1];
-	dtRanges[0].RangeType			= D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	dtRanges[0].NumDescriptors		= 1;
-	dtRanges[0].BaseShaderRegister	= 0; //register t0
-	dtRanges[0].RegisterSpace		= 0; //register(t0,space0);
-	dtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+	D3D12_DESCRIPTOR_RANGE srvRange[1];
+	srvRange[0].RangeType			= D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	srvRange[0].NumDescriptors		= 1;
+	srvRange[0].BaseShaderRegister	= 0; //register t0
+	srvRange[0].RegisterSpace		= 0; //register(t0,space0);
+	srvRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	// Compute shader UAV
-	D3D12_DESCRIPTOR_RANGE  cdtRanges[1];
-
-	cdtRanges[0].RangeType			= D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-	cdtRanges[0].NumDescriptors		= 1; 
-	cdtRanges[0].BaseShaderRegister = 0; //register u0
-	cdtRanges[0].RegisterSpace		= 0; //register(u0,space0);
-	cdtRanges[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-	//create a descriptor table
-	D3D12_ROOT_DESCRIPTOR_TABLE dt;
-	dt.NumDescriptorRanges = ARRAYSIZE(dtRanges);
-	dt.pDescriptorRanges   = dtRanges;
+	D3D12_DESCRIPTOR_RANGE uavRange[1];
+	uavRange[0].RangeType			= D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+	uavRange[0].NumDescriptors		= 1; 
+	uavRange[0].BaseShaderRegister  = 0; //register u0
+	uavRange[0].RegisterSpace		= 0; //register(u0,space0);
+	uavRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 	//create a descriptor table
-	D3D12_ROOT_DESCRIPTOR_TABLE cdt;
-	cdt.NumDescriptorRanges = ARRAYSIZE(cdtRanges);
-	cdt.pDescriptorRanges   = cdtRanges;
+	D3D12_ROOT_DESCRIPTOR_TABLE srvDT;
+	srvDT.NumDescriptorRanges = ARRAYSIZE(srvRange);
+	srvDT.pDescriptorRanges   = srvRange;
 
+	//create a descriptor table
+	D3D12_ROOT_DESCRIPTOR_TABLE uavDT;
+	uavDT.NumDescriptorRanges = ARRAYSIZE(uavRange);
+	uavDT.pDescriptorRanges   = uavRange;
 
 
 	//create root parameter
@@ -570,17 +559,17 @@ void Project::CreateRootSignature()
 
 	// input texture of compute shader
 	rootParam[1].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam[1].DescriptorTable  = dt;
-	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; //used by both compute and pixel shader in the test version
+	rootParam[1].DescriptorTable  = srvDT;
+	rootParam[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; //used by both compute and pixel shader
 
 	// UAV output of compute shader
 	rootParam[2].ParameterType    = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParam[2].DescriptorTable  = cdt;
+	rootParam[2].DescriptorTable  = uavDT;
 	rootParam[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL; // Visible to compute
 
 
 
-	// create a static sampler
+	// static sampler used by the FXAA shader
 	D3D12_STATIC_SAMPLER_DESC bilinearSampler = {};
 	bilinearSampler.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
 	bilinearSampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
@@ -589,7 +578,7 @@ void Project::CreateRootSignature()
 	bilinearSampler.MipLODBias = 0;
 	bilinearSampler.MaxAnisotropy  = 0;
 	bilinearSampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-	bilinearSampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+	bilinearSampler.BorderColor    = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
 	bilinearSampler.MinLOD = 0.0f;
 	bilinearSampler.MaxLOD = D3D12_FLOAT32_MAX;
 	bilinearSampler.ShaderRegister = 0; // (s0)
@@ -606,11 +595,8 @@ void Project::CreateRootSignature()
 
 	ID3DBlob* sBlob;
 	ID3DBlob* errorBlob = nullptr;
-	HRESULT hr = D3D12SerializeRootSignature(
-		&rsDesc,
-		D3D_ROOT_SIGNATURE_VERSION_1,
-		&sBlob,
-		&errorBlob);
+
+	HRESULT hr = D3D12SerializeRootSignature(&rsDesc, D3D_ROOT_SIGNATURE_VERSION_1, &sBlob, &errorBlob);
 
 	if (FAILED(hr)) {
 		OutputDebugStringA((char*)errorBlob->GetBufferPointer());
@@ -627,7 +613,6 @@ void Project::CreateRootSignature()
 }
 
 
-// todo: rename some stuff
 void Project::CreateComputeShaderResources()
 {
 	//// pixel shader output render targets/compute shader inputs ////
@@ -663,16 +648,16 @@ void Project::CreateComputeShaderResources()
 
 	//// Compute shader outputs ////
 
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.DepthOrArraySize = 1;
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	resDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	resDesc.Flags  = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-	resDesc.Width  = SCREEN_WIDTH;
-	resDesc.Height = SCREEN_HEIGHT;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	resDesc.MipLevels = 1;
-	resDesc.SampleDesc.Count = 1;
+	D3D12_RESOURCE_DESC uavResDesc = {};
+	uavResDesc.DepthOrArraySize = 1;
+	uavResDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	uavResDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	uavResDesc.Flags  = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+	uavResDesc.Width  = SCREEN_WIDTH;
+	uavResDesc.Height = SCREEN_HEIGHT;
+	uavResDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	uavResDesc.MipLevels = 1;
+	uavResDesc.SampleDesc.Count = 1;
 
 	D3D12_HEAP_PROPERTIES hp = {};
 	hp.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -680,18 +665,18 @@ void Project::CreateComputeShaderResources()
 	// Initialized as copy source since that's the state it'll be in at the end of every frame
 	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
 		HRESULT hr = gDevice->CreateCommittedResource(
-			&hp, D3D12_HEAP_FLAG_NONE, &resDesc,
+			&hp, D3D12_HEAP_FLAG_NONE, &uavResDesc,
 			D3D12_RESOURCE_STATE_COPY_SOURCE,
 			nullptr, IID_PPV_ARGS(&gPerFrameAllocatorsListsAndResources[i].gUAVResource));
 	}
 
 
-	//// Descriptor heap for the CBV, SRV, and UAV ////
+	//// Descriptor heap for the SRV and UAV used by the FXAA stage ////
 	//
 	// Layout of the descriptor heap
 	//    slot     descriptor
-	//     0-2     UAV, output of compute shader
-	//     3-5     SRV, of the output of the pixel shader
+	//    0 --[N-1]     UAV, output of compute shader
+	//   [N]--[2N-1]    SRV, of the output of the pixel shader
 
 	D3D12_DESCRIPTOR_HEAP_DESC dhd = {};
 	dhd.NumDescriptors = NUM_SWAP_BUFFERS + NUM_SWAP_BUFFERS;
@@ -723,7 +708,7 @@ void Project::CreateComputeShaderResources()
 	}
 
 
-	//// Descriptor heap for the intermediate render targets ////
+	//// Descriptor heap for the intermediate render targets used by the geometry stage ////
 	D3D12_DESCRIPTOR_HEAP_DESC RTVdhd = {};
 	RTVdhd.NumDescriptors = NUM_SWAP_BUFFERS;
 	RTVdhd.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
@@ -741,11 +726,8 @@ void Project::CreateComputeShaderResources()
 		gDevice->CreateRenderTargetView(gPerFrameAllocatorsListsAndResources[n].gIntermediateRenderTarget, nullptr, rtvcdh);
 		rtvcdh.ptr += gRenderTargetDescriptorSize;
 	}
-
-
 }
 
-// todo remove unused stuff
 void Project::CreateConstantBufferResources()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC heapDescriptorDesc = {};
@@ -777,14 +759,12 @@ void Project::CreateConstantBufferResources()
 		&resourceDesc,
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(&gConstantBufferResource))))
+		IID_PPV_ARGS(&gConstantBufferResource)))) 
 	{
 		if (SUCCEEDED(gConstantBufferResource->Map(0, 0, (void**)&mGameStateHandler.pMappedCB)))
 		{
 		}
-
 	}
-
 }
 
 void Project::CopyComputeOutputToBackBuffer(UINT64 frameIndex, int swapBufferIndex, int threadIndex)
@@ -847,7 +827,7 @@ void Project::CopyComputeOutputToBackBuffer(UINT64 frameIndex, int swapBufferInd
 void Project::Render(int id)
 {
 	static int lastRenderIterationSwapBufferIndex = 0;
-	static int lastRenderIterationThreadIndex = 0;
+	static int lastRenderIterationThreadIndex     = 0;
 	static UINT64 frameCounter = 1; //! starts at 1 because of the signal at the end of UploadMeshData()
 	thread_local int swapBufferIndex;
 	thread_local int threadIndex;
@@ -883,6 +863,7 @@ void Project::Render(int id)
 		// Begin the rendering of the next frame once the first part of this frame is done.
 		gThreadPool->push([this](int id) {Render(id); });
 
+
 		////////// FXAA section //////////
 
 		// Apply FXAA to the rendered image with a compute shader
@@ -890,7 +871,6 @@ void Project::Render(int id)
 
 		// Signal that the FXAA stage is finished
 		gCommandQueues[QT_COMP]->Signal(gFrameFences[swapBufferIndex], ++gFrameFenceValues[swapBufferIndex]);
-
 
 
 		////////// Present section //////////

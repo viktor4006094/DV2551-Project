@@ -24,7 +24,7 @@ float4 PS_main( VSOut input ) : SV_TARGET0
     float strongLightBrightness = 0.8;
     float weakLightBrightness   = 0.2;
 
-    float diff_coef = max(dot(normalize(strongLightDir), normOut), 0.0);
+    float  diff_coef = max(dot(normalize(strongLightDir), normOut), 0.0);
     float3 diff_comp = (1.0 - AMBIENT) * diff_coef * strongLightBrightness * input.color.rgb;
 
     diff_coef = max(dot(normalize(weakLightDir), normOut), 0.0);
