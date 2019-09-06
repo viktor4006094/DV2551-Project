@@ -147,11 +147,6 @@ void GameStateHandler::Update(int id)
 			previousDragonData = currentDragonData;
 			currentDragonData = tempDragonData;
 			dragonDataLock.unlock();
-
-
-			// FOR TESTING
-			// no interpolation
-			//PrepareRender(0.0f);
 		}
 	}
 }
@@ -160,6 +155,8 @@ void GameStateHandler::Update(int id)
 // alpha = [0,1) linear interpolation between previous and current Dragon data.
 void GameStateHandler::PrepareRender(float alpha)
 {
+	//alpha = 0.0f; // turn off interpolation
+
 	dragonDataLock.lock();
 	for (int m = 0; m < TOTAL_DRAGONS; m++) {
 		//Update world matrixes of each mesh

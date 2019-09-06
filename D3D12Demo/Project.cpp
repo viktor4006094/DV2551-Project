@@ -850,38 +850,13 @@ void Project::Render(int id)
 	threadIndex = lastRenderIterationThreadIndex;
 	lastRenderIterationThreadIndex = (++lastRenderIterationThreadIndex) % NUM_THREADS;
 		
-	
-	static auto currentTime = std::chrono::high_resolution_clock::now();
-	static float accumulator = 0.0f;
-
-
 	if (isRunning) {
 		////////// Linearly interpolate the gamestate //////////
-		auto newTime = std::chrono::high_resolution_clock::now();
-		double frameTime = std::chrono::duration<double, std::milli>(newTime - currentTime).count();
-		// if frameTime > 0.25 ???
-		currentTime = newTime;
-
-		accumulator += frameTime; // NOTE: not threadsafe but whatever
-		double accumulatorCopy = accumulator;
-
-		double t = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - mGameStateHandler.startTime).count();
-		float dt = 1.0f / mGameStateHandler.tickRate;
-
-		
-
-		float alpha = std::fmod(t, 1000.0)/1000.0f;
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double, std::milli> delta = currentTime - mGameStateHandler.startTime;
+		float alpha = std::fmod(delta.count(), (1000.0 / mGameStateHandler.tickRate)) / (1000.0f / mGameStateHandler.tickRate);
 
 		mGameStateHandler.PrepareRender(alpha);
-
-
-
-
-
-
-
-
-
 
 
 
@@ -896,7 +871,7 @@ void Project::Render(int id)
 
 
 		// Begin the rendering of the next frame once the first part of this frame is done.
-		gThreadPool->push([this](int id) {Render(id); });
+		gThreadPool->push([this](int id) { Render(id); });
 
 
 		////////// FXAA section //////////
