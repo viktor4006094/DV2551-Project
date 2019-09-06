@@ -849,14 +849,29 @@ void Project::Render(int id)
 	//get the thread index
 	threadIndex = lastRenderIterationThreadIndex;
 	lastRenderIterationThreadIndex = (++lastRenderIterationThreadIndex) % NUM_THREADS;
+		
+	
+	static auto currentTime = std::chrono::high_resolution_clock::now();
+	static float accumulator = 0.0f;
+
 
 	if (isRunning) {
-
 		////////// Linearly interpolate the gamestate //////////
+		auto newTime = std::chrono::high_resolution_clock::now();
+		double frameTime = std::chrono::duration<double, std::milli>(newTime - currentTime).count();
+		// if frameTime > 0.25 ???
+		currentTime = newTime;
+
+		accumulator += frameTime; // NOTE: not threadsafe but whatever
+		double accumulatorCopy = accumulator;
+
 		double t = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - mGameStateHandler.startTime).count();
+		float dt = 1.0f / mGameStateHandler.tickRate;
 
+		
 
-		float alpha = 0.0f;
+		float alpha = std::fmod(t, 1000.0)/1000.0f;
+
 		mGameStateHandler.PrepareRender(alpha);
 
 

@@ -29,6 +29,7 @@ public:
 	CONSTANT_BUFFER_DATA cbData[TOTAL_DRAGONS];
 	CONSTANT_BUFFER_DATA *pMappedCB = nullptr;
 
+	const double tickRate = 10.0;
 	std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::high_resolution_clock::now();
 private:
 	DirectX::XMMATRIX projMat = DirectX::XMMatrixOrthographicLH((48.0f*SCREEN_WIDTH) / SCREEN_HEIGHT, 48.0f, 0.1f, 100.0f);

@@ -89,7 +89,7 @@ void GameStateHandler::Update(int id)
 {
 	//static auto startTime = std::chrono::high_resolution_clock::now();
 	//static double tickRate = 512.0;
-	static double tickRate = 10.0;
+	
 
 	while (isRunning) {
 		double t = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - startTime).count();
