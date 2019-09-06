@@ -6,7 +6,8 @@
 
 GameStateHandler::GameStateHandler()
 {
-
+	currentDragonData  = std::vector<PER_DRAGON_DATA>(TOTAL_DRAGONS);
+	previousDragonData = std::vector<PER_DRAGON_DATA>(TOTAL_DRAGONS);
 }
 
 GameStateHandler::~GameStateHandler()
@@ -33,12 +34,17 @@ void GameStateHandler::CreatePerMeshData()
 			break;
 		}
 
-		DirectX::XMStoreFloat4x4(
-			&cbData[i].world,
-			DirectX::XMMatrixTranspose(
-				DirectX::XMMatrixScaling(2.0f, 2.0f, 2.0f) * DirectX::XMMatrixTranslation((i / 2) * 30.0f - 15.0f, (i % 2) * 24.0f - 12.0f, 0.0f)
-			)
-		);
+		//DirectX::XMStoreFloat4x4(
+		//	&cbData[i].world,
+		//	DirectX::XMMatrixTranspose(
+		//		DirectX::XMMatrixScaling(2.0f, 2.0f, 2.0f) * DirectX::XMMatrixTranslation((i / 2) * 30.0f - 15.0f, (i % 2) * 24.0f - 12.0f, 0.0f)
+		//	)
+		//);
+
+		currentDragonData[i].position = { (i / 2) * 30.0f - 15.0f, (i % 2) * 24.0f - 12.0f, 0.0f };
+		currentDragonData[i].angle = 0.0f;
+		currentDragonData[i].scale = { 2.0f, 2.0f, 2.0f };
+
 	}
 
 	srand(static_cast<unsigned int>(std::time(0)));
@@ -50,13 +56,19 @@ void GameStateHandler::CreatePerMeshData()
 		c = ((float)rand()) / (float)RAND_MAX;
 		cbData[i].color = float4{ a, b, c, 1.0f };
 		int j = i - 4;
-		DirectX::XMStoreFloat4x4(
-			&cbData[i].world,
-			DirectX::XMMatrixTranspose(
-				DirectX::XMMatrixScaling(0.2f, 0.2f, 0.2f)* DirectX::XMMatrixTranslation((j / 10) * 6.0f - 28.0f, (j %10) * 4.8f - 13.0f, 20.0f)
-			)
-		);
+		//DirectX::XMStoreFloat4x4(
+		//	&cbData[i].world,
+		//	DirectX::XMMatrixTranspose(
+		//		DirectX::XMMatrixScaling(0.2f, 0.2f, 0.2f)* DirectX::XMMatrixTranslation((j / 10) * 6.0f - 28.0f, (j %10) * 4.8f - 13.0f, 20.0f)
+		//	)
+		//);
+
+		currentDragonData[i].position = { (j / 10) * 6.0f - 28.0f, (j % 10) * 4.8f - 13.0f, 20.0f };
+		currentDragonData[i].angle = 0.0f;
+		currentDragonData[i].scale = { 0.2f, 0.2f, 0.2f };
+
 	}
+	previousDragonData = currentDragonData;
 }
 
 void GameStateHandler::ShutDown()
@@ -68,7 +80,8 @@ void GameStateHandler::ShutDown()
 void GameStateHandler::Update(int id)
 {
 	static auto startTime = std::chrono::high_resolution_clock::now();
-	static double tickRate = 512.0;
+	//static double tickRate = 512.0;
+	static double tickRate = 10.0;
 
 	while (isRunning) {
 		double t = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - startTime).count();

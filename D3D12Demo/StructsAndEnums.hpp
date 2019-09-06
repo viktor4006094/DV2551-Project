@@ -82,6 +82,16 @@ typedef union {
 	struct { float r, g, b, a; };
 } float4;
 
+struct float3 {
+	float x, y, z;
+};
+
+struct PER_DRAGON_DATA {
+	float3 position = { 0.0f, 0.0f, 0.0f };
+	float3 scale    = { 0.0f, 0.0f, 0.0f };
+	float angle = 0.0f;
+};
+
 struct alignas(256) CONSTANT_BUFFER_DATA {
 	DirectX::XMFLOAT4X4 world;
 	DirectX::XMFLOAT4X4 viewProj;

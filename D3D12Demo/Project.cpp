@@ -851,6 +851,23 @@ void Project::Render(int id)
 	lastRenderIterationThreadIndex = (++lastRenderIterationThreadIndex) % NUM_THREADS;
 
 	if (isRunning) {
+
+		////////// Linearly interpolate the gamestate //////////
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 		////////// Render geometry section //////////
 
 		// Render the geometry
