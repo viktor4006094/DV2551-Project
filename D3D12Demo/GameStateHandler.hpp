@@ -15,7 +15,9 @@ public:
 	void ShutDown();
 	void Update(int id);
 
+	void PrepareRender(float alpha);
 
+	std::vector<PER_DRAGON_DATA> tempDragonData;
 	std::vector<PER_DRAGON_DATA> currentDragonData;
 	std::vector<PER_DRAGON_DATA> previousDragonData;
 
