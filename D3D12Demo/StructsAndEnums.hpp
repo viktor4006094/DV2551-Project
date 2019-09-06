@@ -92,6 +92,10 @@ struct PER_DRAGON_DATA {
 	float angle = 0.0f;
 };
 
+struct DRAGON_START_MATRIX {
+	DirectX::XMFLOAT4X4 worldStart;
+};
+
 struct alignas(256) CONSTANT_BUFFER_DATA {
 	DirectX::XMFLOAT4X4 world;
 	DirectX::XMFLOAT4X4 viewProj;

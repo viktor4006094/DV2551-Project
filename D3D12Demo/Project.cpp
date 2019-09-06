@@ -637,7 +637,7 @@ void Project::CreateComputeShaderResources()
 	clv.Color[2] = gClearColor[2];
 	clv.Color[3] = gClearColor[3];
 
-	// Create a commited resource on the GPU for all intermediate render targets used by the geometry pass
+	// Create a committed resource on the GPU for all intermediate render targets used by the geometry pass
 	for (int i = 0; i < NUM_SWAP_BUFFERS; ++i) {
 		HRESULT hr = gDevice->CreateCommittedResource(
 			&intRThp, D3D12_HEAP_FLAG_NONE, &intRTresDesc,
@@ -853,8 +853,11 @@ void Project::Render(int id)
 	if (isRunning) {
 
 		////////// Linearly interpolate the gamestate //////////
+		double t = std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() - mGameStateHandler.startTime).count();
 
 
+		float alpha = 0.0f;
+		mGameStateHandler.PrepareRender(alpha);
 
 
 

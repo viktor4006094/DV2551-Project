@@ -36,8 +36,14 @@ void GameStateHandler::CreatePerMeshData()
 			break;
 		}
 
-		DirectX::XMStoreFloat4x4(
+		/*DirectX::XMStoreFloat4x4(
 			&cbData[i].world,
+			DirectX::XMMatrixTranspose(
+				DirectX::XMMatrixScaling(2.0f, 2.0f, 2.0f) * DirectX::XMMatrixTranslation((i / 2) * 30.0f - 15.0f, (i % 2) * 24.0f - 12.0f, 0.0f)
+			)
+		);*/
+		DirectX::XMStoreFloat4x4(
+			&startMatrixes[i].worldStart,
 			DirectX::XMMatrixTranspose(
 				DirectX::XMMatrixScaling(2.0f, 2.0f, 2.0f) * DirectX::XMMatrixTranslation((i / 2) * 30.0f - 15.0f, (i % 2) * 24.0f - 12.0f, 0.0f)
 			)
@@ -59,7 +65,7 @@ void GameStateHandler::CreatePerMeshData()
 		cbData[i].color = float4{ a, b, c, 1.0f };
 		int j = i - 4;
 		DirectX::XMStoreFloat4x4(
-			&cbData[i].world,
+			&startMatrixes[i].worldStart,
 			DirectX::XMMatrixTranspose(
 				DirectX::XMMatrixScaling(0.2f, 0.2f, 0.2f)* DirectX::XMMatrixTranslation((j / 10) * 6.0f - 28.0f, (j %10) * 4.8f - 13.0f, 20.0f)
 			)
@@ -81,7 +87,7 @@ void GameStateHandler::ShutDown()
 
 void GameStateHandler::Update(int id)
 {
-	static auto startTime = std::chrono::high_resolution_clock::now();
+	//static auto startTime = std::chrono::high_resolution_clock::now();
 	//static double tickRate = 512.0;
 	static double tickRate = 10.0;
 
@@ -103,7 +109,8 @@ void GameStateHandler::Update(int id)
 
 
 					//currentDragonData[m].position = { (j / 10) * 6.0f - 28.0f, (j % 10) * 4.8f - 13.0f, 20.0f };
-					currentDragonData[m].angle = (-1.0f / static_cast<float>(tickRate * 5.0f));
+					float test = (-1.0f / static_cast<float>(tickRate * 5.0f));
+					tempDragonData[m].angle += (-1.0f / static_cast<float>(tickRate * 5.0f));
 					//currentDragonData[m].scale = { 0.2f, 0.2f, 0.2f };
 				}
 				else {
@@ -120,7 +127,7 @@ void GameStateHandler::Update(int id)
 					DirectX::XMStoreFloat4x4(&cbData[m].viewProj, DirectX::XMMatrixTranspose(viewMat*projMat));*/
 
 					//currentDragonData[i].position = { (j / 10) * 6.0f - 28.0f, (j % 10) * 4.8f - 13.0f, 20.0f };
-					currentDragonData[m].angle = (dir / static_cast<float>(tickRate * speed));
+					tempDragonData[m].angle += (dir / static_cast<float>(tickRate * speed));
 					//currentDragonData[i].scale = { 0.2f, 0.2f, 0.2f };
 				}
 
@@ -144,7 +151,7 @@ void GameStateHandler::Update(int id)
 
 			// FOR TESTING
 			// no interpolation
-			PrepareRender(0.0f);
+			//PrepareRender(0.0f);
 		}
 	}
 }
@@ -158,7 +165,7 @@ void GameStateHandler::PrepareRender(float alpha)
 		//Update world matrixes of each mesh
 
 		float angle = alpha * currentDragonData[m].angle + (1.0f - alpha) * previousDragonData[m].angle;
-		DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&cbData[m].world)*DirectX::XMMatrixRotationY(angle);
+		DirectX::XMMATRIX temp = DirectX::XMLoadFloat4x4(&startMatrixes[m].worldStart)*DirectX::XMMatrixRotationY(angle);
 		DirectX::XMStoreFloat4x4(&cbData[m].world, temp);
 		DirectX::XMStoreFloat4x4(&cbData[m].viewProj, DirectX::XMMatrixTranspose(viewMat*projMat));;
 	}
