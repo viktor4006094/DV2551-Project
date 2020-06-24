@@ -11,7 +11,7 @@ Therefore, moving the FXAA stage to the compute queue did not improve the parall
 The images below show 104 Stanford Dragons rendered by the application, before and after the FXAA demo pass.
 ![Before FXAA](/GitHubMedia/FXAAin.png?raw=true "Before FXAA")
 ![After FXAA](/GitHubMedia/FXAAout.png?raw=true "After FXAA")
-- **Top left quadrant: 3x magnification.** 
+- **Top left quadrant:** 3x magnification. 
     - **Left side:** FXAA off.
     - **Right side:** FXAA on.
 - **Bottom left quadrant:** Edges detected by the FXAA algorithm.
